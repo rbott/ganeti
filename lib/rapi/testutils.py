@@ -36,7 +36,7 @@ import base64
 import logging
 import re
 
-from io import StringIO
+from io import BytesIO
 
 import pycurl
 
@@ -194,7 +194,7 @@ class FakeCurl(object):
     else:
       baseheaders = ""
 
-    headers = http.ParseHeaders(StringIO(baseheaders))
+    headers = http.ParseHeaders(BytesIO(baseheaders))
 
     if request_body:
       headers[http.HTTP_CONTENT_LENGTH] = str(len(request_body))

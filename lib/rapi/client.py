@@ -56,9 +56,9 @@ import pycurl
 import simplejson
 
 try:
-  from io import StringIO
+  from io import BytesIO
 except ImportError:
-  from io import StringIO
+  from io import BytesIO
 
 
 GANETI_RAPI_PORT = 5080
@@ -540,7 +540,7 @@ class GanetiRapiClient(object): # pylint: disable=R0904
                        method, url, encoded_content)
 
     # Buffer for response
-    encoded_resp_body = StringIO()
+    encoded_resp_body = BytesIO()
 
     # Configure cURL
     curl.setopt(pycurl.CUSTOMREQUEST, str(method))
