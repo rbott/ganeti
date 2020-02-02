@@ -2555,13 +2555,13 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     if not live_migration:
       self._CallMonitorCommand(instance_name, "stop")
 
-    migrate_command = ("migrate_set_speed %dm" %
-                       instance.hvparams[constants.HV_MIGRATION_BANDWIDTH])
-    self._CallMonitorCommand(instance_name, migrate_command)
-
-    migrate_command = ("migrate_set_downtime %dms" %
-                       instance.hvparams[constants.HV_MIGRATION_DOWNTIME])
-    self._CallMonitorCommand(instance_name, migrate_command)
+    qmp = QmpConnection(self._InstanceQmpMonitor(instance_name))
+    qmp.connect()
+    arguments = {
+      "max-bandwith": instance.hvparams[constants.HV_MIGRATION_BANDWIDTH],
+      "downtime-limit": instance.hvparams[constants.HV_MIGRATION_DOWNTIME],
+    }
+    qmp.Execute("migrate-set-parameters", arguments)
 
     migration_caps = instance.hvparams[constants.HV_KVM_MIGRATION_CAPS]
     if migration_caps:
