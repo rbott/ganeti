@@ -1400,6 +1400,8 @@ def _TestInstanceUserDownKvm(instance):
 def TestInstanceUserDown(instance):
   """Tests user shutdown"""
   enabled_hypervisors = qa_config.GetEnabledHypervisors()
+  print("qa_config.GetEnabledHypervisors() returns the following list:")
+  print(enabled_hypervisors)
 
   for (hv, fn) in [(constants.HT_XEN_PVM, _TestInstanceUserDownXen),
                    (constants.HT_XEN_HVM, _TestInstanceUserDownXen),
