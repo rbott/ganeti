@@ -1838,6 +1838,27 @@ class LUClusterVerifyGroup(LogicalUnit, _VerifyErrors):
     if n_drained:
       feedback_fn("  - NOTICE: %d drained node(s) found." % n_drained)
 
+  def _AssessHypervisorParameters(self):
+    """Check clusterwide hypervisor parameters for suboptimal values
+
+    """
+    self._feedback_fn("* Clusterwide Hypervisor Parameter Assessment")
+
+    cluster = self.cfg.GetClusterInfo()
+    for hv_name in cluster.enabled_hypervisors:
+      msg = ("hypervisor %s parameter assessment: %%s" %
+             hv_name)
+      hv_params = cluster.GetHVDefaults(hv_name)
+      try:
+        hv_class = hypervisor.GetHypervisorClass(hv_name)
+        utils.ForceDictType(hv_params, constants.HVS_PARAMETER_TYPES)
+        warnings = hv_class.AssessParameters(hv_params)
+      except errors.GenericError as err:
+        self._ErrorIf(True, constants.CV_ECLUSTERCFG, None, msg % str(err))
+
+      for warning in warnings:
+        self._feedback_fn("  - %s" % warning)
+
   def _VerifyExclusionTags(self, nodename, pinst, ctags):
     """Verify that all instances have different exclusion tags.
 
@@ -2252,6 +2273,8 @@ class LUClusterVerifyGroup(LogicalUnit, _VerifyErrors):
 
     self._VerifyOtherNotes(feedback_fn, i_non_redundant, i_non_a_balanced,
                            i_offline, n_offline, n_drained)
+
+    self._AssessHypervisorParameters()
 
     return not self.bad
 

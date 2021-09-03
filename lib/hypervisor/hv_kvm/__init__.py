@@ -2905,6 +2905,71 @@ class KVMHypervisor(hv_base.BaseHypervisor):
                                      machine_version)
 
   @classmethod
+  def AssessParameters(cls, hvparams):
+    """Check the given parameters for uncommon/suboptimal values
+
+    This should check the passed set of parameters for suboptimal
+    values.
+
+    @type hvparams: dict
+    @param hvparams: dictionary with parameter names/value
+
+    """
+
+    warnings = []
+
+    cpu_type = hvparams[constants.HV_CPU_TYPE]
+    if cpu_type in ("qemu32", "qemu64", "kvm32", "kvm64"):
+      warnings.append("cpu_type is currently set to the default of '%s',"
+                      " please check http://x for more information." %
+                      cpu_type)
+    elif cpu_type == "host":
+      warnings.append("cpu_type is currently set to 'host', please make"
+                      " sure all your cluster nodes have the exact same"
+                      " CPU type to allow live migrations.")
+
+    disk_aio = hvparams[constants.HV_KVM_DISK_AIO]
+    if disk_aio == "threads":
+      warnings.append("disk_aio is set to 'threads' and should be set"
+                      " to 'native' for better disk performance.")
+
+    migration_bandwidth = hvparams[constants.HV_MIGRATION_BANDWIDTH]
+    if migration_bandwidth < 125:
+      warnings.append("migration_bandwidth is set to less than 125 MiB/s"
+                      ", please consider adjusting it to a higher value"
+                      " that can leverage todays network speeds.")
+
+    disk_type = hvparams[constants.HV_DISK_TYPE]
+    if disk_type != "paravirtual":
+      warnings.append("disk_type is set to '%s' instead of 'paravirtual'"
+                      ", please consider virtio-based disks for the best"
+                      " performance." % disk_type)
+
+    nic_type = hvparams[constants.HV_NIC_TYPE]
+    if nic_type != "paravirtual":
+      warnings.append("nic_type is set to '%s' instead of 'paravirtual'"
+                      ", please consider virtio-based networking for the"
+                      " best performance." % nic_type)
+
+    vnc_bind_address = hvparams[constants.HV_VNC_BIND_ADDRESS]
+    vnc_tls_enabled = hvparams[constants.HV_VNC_TLS]
+
+    if vnc_bind_address and not vnc_tls_enabled:
+      warnings.append("VNC is configured but without TLS, please"
+                      " consider setting vnc_tls to 'true'"
+                      " for additional security.")
+
+    spice_bind_address = hvparams[constants.HV_KVM_SPICE_BIND]
+    spice_tls_enabled = hvparams[constants.HV_KVM_SPICE_USE_TLS]
+
+    if spice_bind_address and not spice_tls_enabled:
+      warnings.append("Spice is configured but without TLS, please"
+                      " consider setting spice_use_tls to 'true'"
+                      " for additional security.")
+
+    return warnings
+
+  @classmethod
   def PowercycleNode(cls, hvparams=None):
     """KVM powercycle, just a wrapper over Linux powercycle.
 
