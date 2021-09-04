@@ -1377,7 +1377,7 @@ def _TestInstanceUserDownXen(instance):
 def _TestInstanceUserDownKvm(instance):
   def _StopKVMInstance():
     AssertCommand("pkill -f \"\\-name %s\"" % instance.name, node=primary)
-    time.sleep(10)
+    time.sleep(5)
 
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
   AssertCommand(["gnt-instance", "modify", "-H", "user_shutdown=true",

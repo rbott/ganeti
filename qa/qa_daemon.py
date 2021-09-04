@@ -138,7 +138,7 @@ def TestInstanceAutomaticRestart(instance):
   _ShutdownInstance(inst_name)
 
   RunWatcherDaemon()
-  time.sleep(5)
+  time.sleep(2)
 
   if not _InstanceRunning(inst_name):
     raise qa_error.Error("Daemon didn't restart instance")
@@ -158,7 +158,7 @@ def TestInstanceConsecutiveFailures(instance):
   for should_start in ([True] * 5) + [False]:
     _ShutdownInstance(inst_name)
     RunWatcherDaemon()
-    time.sleep(5)
+    time.sleep(2)
 
     if bool(_InstanceRunning(inst_name)) != should_start:
       if should_start:

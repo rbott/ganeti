@@ -1053,7 +1053,7 @@ def _TestClusterModifyUserShutdownXen(nodes):
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
 
   # Give time for kvmd to start and stop on all nodes
-  time.sleep(5)
+  time.sleep(2)
 
   for node in nodes:
     AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
@@ -1072,7 +1072,7 @@ def _TestClusterModifyUserShutdownKvm(nodes):
 
   """
   # How much time to wait for kvmd to start/stop
-  kvmd_cycle_time = 4
+  kvmd_cycle_time = 2
 
   # Start kvmd on all nodes
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
