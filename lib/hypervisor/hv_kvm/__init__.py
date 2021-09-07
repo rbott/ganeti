@@ -2919,9 +2919,14 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     warnings = []
 
     cpu_type = hvparams[constants.HV_CPU_TYPE]
-    if cpu_type in ("qemu32", "qemu64", "kvm32", "kvm64"):
-      warnings.append("cpu_type is currently set to the default of '%s',"
-                      " please check http://x for more information." %
+    if not cpu_type:
+      warnings.append("cpu_type is currently unset and defaults to 'qemu64'"
+                      ", please read the gnt-instance man page on the security"
+                      " implications of this parameter.")
+    elif cpu_type in ("qemu32", "qemu64", "kvm32", "kvm64"):
+      warnings.append("cpu_type is currently set to '%s'"
+                      ", please read the gnt-instance man page on the security"
+                      " implications of this parameter." %
                       cpu_type)
     elif cpu_type == "host":
       warnings.append("cpu_type is currently set to 'host', please make"
