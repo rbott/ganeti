@@ -58,7 +58,7 @@ HVCLASS_TO_HVNAME = utils.InvertDict(hypervisor._HYPERVISOR_MAP)
 
 class TestConsole(unittest.TestCase):
   def test(self):
-    hvparams = {constants.HV_XEN_CMD: constants.XEN_CMD_XL}
+    hvparams = {}
     for cls in [hv_xen.XenPvmHypervisor(), hv_xen.XenHvmHypervisor()]:
       instance = objects.Instance(name="xen.example.com",
                                   primary_node="node24828-uuid")
@@ -89,39 +89,6 @@ class TestCreateConfigCpus(unittest.TestCase):
     self.assertEqual(hv_xen._CreateConfigCpus("0-2,4,5-5:3:all"),
                      ("cpus = [ \"0,1,2,4,5\", \"3\", \"%s\" ]" %
                       constants.CPU_PINNING_ALL_XEN))
-
-
-class TestGetCommand(testutils.GanetiTestCase):
-  def testCommandExplicit(self):
-    """Test the case when the command is given as class parameter explicitly.
-
-    """
-    expected_cmd = "xl"
-    hv = hv_xen.XenHypervisor(_cmd=constants.XEN_CMD_XL)
-    self.assertEqual(hv._GetCommand(None), expected_cmd)
-
-  def testCommandInvalid(self):
-    """Test the case an invalid command is given as class parameter explicitly.
-
-    """
-    hv = hv_xen.XenHypervisor(_cmd="invalidcommand")
-    self.assertRaises(errors.ProgrammerError, hv._GetCommand, None)
-
-  def testCommandHvparams(self):
-    expected_cmd = "xl"
-    test_hvparams = {constants.HV_XEN_CMD: constants.XEN_CMD_XL}
-    hv = hv_xen.XenHypervisor()
-    self.assertEqual(hv._GetCommand(test_hvparams), expected_cmd)
-
-  def testCommandHvparamsInvalid(self):
-    test_hvparams = {}
-    hv = hv_xen.XenHypervisor()
-    self.assertRaises(errors.HypervisorError, hv._GetCommand, test_hvparams)
-
-  def testCommandHvparamsCmdInvalid(self):
-    test_hvparams = {constants.HV_XEN_CMD: "invalidcommand"}
-    hv = hv_xen.XenHypervisor()
-    self.assertRaises(errors.ProgrammerError, hv._GetCommand, test_hvparams)
 
 
 class TestParseInstanceList(testutils.GanetiTestCase):
@@ -454,15 +421,6 @@ class TestXenHypervisorRunXen(unittest.TestCase):
     hvparams = None
     self.assertRaises(errors.HypervisorError, hv._RunXen, [self.XEN_SUB_CMD],
                       hvparams)
-
-  def testCommandFromHvparams(self):
-    expected_xen_cmd = "xl"
-    hvparams = {constants.HV_XEN_CMD: constants.XEN_CMD_XL}
-    mock_run_cmd = mock.Mock()
-    hv = hv_xen.XenHypervisor(_cfgdir=NotImplemented,
-                              _run_cmd_fn=mock_run_cmd)
-    hv._RunXen([self.XEN_SUB_CMD], hvparams=hvparams)
-    mock_run_cmd.assert_called_with([expected_xen_cmd, self.XEN_SUB_CMD])
 
 
 class TestXenHypervisorGetInstanceList(unittest.TestCase):
@@ -958,20 +916,11 @@ class _TestXenHypervisor(object):
     if cmd == [self.CMD, "list"]:
       output = testutils.ReadTestData("xen-xm-list-4.0.1-four-instances.txt")
     elif cmd[:2] == [self.CMD, "migrate"]:
-      if self.CMD == constants.XEN_CMD_XM:
-        args = ["-p", str(port)]
+      args = [
+        "-s", constants.XL_SOCAT_CMD % (target, port),
+        "-C", utils.PathJoin(self.tmpdir, instance_name),
+        ]
 
-        if live:
-          args.append("-l")
-
-      elif self.CMD == constants.XEN_CMD_XL:
-        args = [
-          "-s", constants.XL_SOCAT_CMD % (target, port),
-          "-C", utils.PathJoin(self.tmpdir, instance_name),
-          ]
-
-      else:
-        self.fail("Unknown Xen command '%s'" % self.CMD)
 
       args.extend([instance_name, target])
       self.assertEqual(cmd[2:], args)
@@ -1016,10 +965,7 @@ class _TestXenHypervisor(object):
           hv._MigrateInstance(instname, target, port, live,
                               hvparams, _ping_fn=ping_fn)
 
-        if self.CMD == constants.XEN_CMD_XM:
-          expected_pings = 1
-        else:
-          expected_pings = 0
+        expected_pings = 0
 
         self.assertEqual(ping_fn.Count(), expected_pings)
 
