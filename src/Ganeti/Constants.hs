@@ -4006,7 +4006,7 @@ validSsHvparamsKeys =
                        ssHvparamsXenHvm,
                        ssHvparamsXenKvm,
                        ssHvparamsXenPvm,
-                       sshHvparamsDocker]
+                       ssHvparamsDocker]
 
 ssFilePerms :: Int
 ssFilePerms = 0o444
