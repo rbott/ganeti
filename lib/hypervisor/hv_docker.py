@@ -135,7 +135,9 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     dir, if it exist, otherwise we raise an exception.
 
     """
-    pass
+    container = self.docker.containers.get('/%s' % instance.name)
+    container.stop()
+    
 
   def RebootInstance(self, instance):
     """Reboot an instance.
