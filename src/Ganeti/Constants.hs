@@ -2664,6 +2664,9 @@ htChroot = Types.hypervisorToRaw Chroot
 htLxc :: String
 htLxc = Types.hypervisorToRaw Lxc
 
+htDocker :: String
+htDocker = Types.hypervisorToRaw Docker
+
 hyperTypes :: FrozenSet String
 hyperTypes = ConstantUtils.mkSet $ map Types.hypervisorToRaw [minBound..]
 
@@ -3992,6 +3995,9 @@ ssHvparamsXenLxc = ssHvparamsPref ++ htLxc
 ssHvparamsXenPvm :: String
 ssHvparamsXenPvm = ssHvparamsPref ++ htXenPvm
 
+sshHvparamsDocker :: String
+sshHvparamsDocker = sshHvparamsPref ++ htDocker
+
 validSsHvparamsKeys :: FrozenSet String
 validSsHvparamsKeys =
   ConstantUtils.mkSet [ssHvparamsXenChroot,
@@ -3999,7 +4005,8 @@ validSsHvparamsKeys =
                        ssHvparamsXenFake,
                        ssHvparamsXenHvm,
                        ssHvparamsXenKvm,
-                       ssHvparamsXenPvm]
+                       ssHvparamsXenPvm,
+                       sshHvparamsDocker]
 
 ssFilePerms :: Int
 ssFilePerms = 0o444
