@@ -28,7 +28,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-"""Fake hypervisor
+"""Docker hypervisor
 
 """
 
@@ -39,9 +39,7 @@ import docker
 
 from ganeti import utils
 from ganeti import constants
-from ganeti import errors
 from ganeti import objects
-from ganeti import pathutils
 from ganeti.hypervisor import hv_base
 
 
