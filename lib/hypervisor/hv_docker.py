@@ -69,7 +69,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     names = []
     for container in self.docker.containers.list():
       names.append(container.attrs['Name'][1:])
-    logger.info("Running containers: %s" % (names))
+    logging.info("Running containers: %s" % (names))
     return names
 
   def GetInstanceInfo(self, instance_name, hvparams=None):
