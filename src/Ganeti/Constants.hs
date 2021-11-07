@@ -4183,7 +4183,6 @@ hvcDefaults =
           , (hvLxcNumTtys,          PyValueEx (6 :: Int))
           , (hvLxcStartupTimeout,   PyValueEx (30 :: Int))
           ])
-  , (Docker, Map.fromList [(hvMigrationMode, PyValueEx htMigrationLive)])
   ]
 
 hvcGlobals :: FrozenSet String
