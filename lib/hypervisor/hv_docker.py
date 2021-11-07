@@ -52,6 +52,11 @@ class DockerHypervisor(hv_base.BaseHypervisor):
 
   _DOCKER = "/usr/sbin/docker"
 
+  PARAMETERS =  {
+    constants.HV_DOCKER_IMAGE: hv_base.REQUIRED_CHECK,
+    constants.HV_DOCKER_TAG: hv_base.REQUIRED_CHECK
+  }
+
 
   def __init__(self):
     hv_base.BaseHypervisor.__init__(self)

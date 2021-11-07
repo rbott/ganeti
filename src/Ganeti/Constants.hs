@@ -1753,6 +1753,12 @@ hvKvmUseChroot = "use_chroot"
 hvKvmUserShutdown :: String
 hvKvmUserShutdown = "user_shutdown"
 
+hvDockerImage :: String
+hvDockerImage = "docker_image"
+
+hvDockerTag :: String
+hvDockerTag = "docker_tag"
+
 hvLxcStartupTimeout :: String
 hvLxcStartupTimeout = "startup_timeout"
 
@@ -1946,6 +1952,8 @@ hvsParameterTypes = Map.fromList
   , (hvLxcExtraConfig,                  VTypeString)
   , (hvLxcNumTtys,                      VTypeInt)
   , (hvLxcStartupTimeout,               VTypeInt)
+  , (hvDockerImage,                     VTypeString)
+  , (hvDockerTag,                       VTypeString)
   , (hvMemPath,                         VTypeString)
   , (hvMigrationBandwidth,              VTypeInt)
   , (hvMigrationDowntime,               VTypeInt)
@@ -4183,7 +4191,10 @@ hvcDefaults =
           , (hvLxcNumTtys,          PyValueEx (6 :: Int))
           , (hvLxcStartupTimeout,   PyValueEx (30 :: Int))
           ])
-  , (Docker, Map.fromList [])
+  , (Docker, Map.fromList
+             [ (hvDockerImage,      PyValueEx "")
+             , (hvDockerTag,        PyValueEx "latest")
+             ])
   ]
 
 hvcGlobals :: FrozenSet String
