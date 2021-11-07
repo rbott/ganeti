@@ -104,7 +104,14 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     handle race conditions properly, since these are *FAKE* instances.
 
     """
-    pass
+    hvp = instance.hvparams
+    logging.info("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
+                                           hvp[constants.HV_DOCKER_TAG]))
+    self.docker.images.pull("%s:%s" % (hvp[constants.HV_DOCKER_IMAGE],
+                                       hvp[constants.HV_DOCKER_TAG]))
+    self.docker.containers.run("%s:%s" % (hvp[constants.HV_DOCKER_IMAGE],
+                                          hvp[constants.HV_DOCKER_TAG]),
+                               detach=True)
 
 
   def StopInstance(self, instance, force=False, retry=False, name=None,
