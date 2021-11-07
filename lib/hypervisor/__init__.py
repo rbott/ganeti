@@ -40,6 +40,7 @@ from ganeti.hypervisor import hv_xen
 from ganeti.hypervisor import hv_kvm
 from ganeti.hypervisor import hv_chroot
 from ganeti.hypervisor import hv_lxc
+from ganeti.hypervisor import hv_docker
 
 
 _HYPERVISOR_MAP = {
@@ -49,6 +50,7 @@ _HYPERVISOR_MAP = {
   constants.HT_KVM: hv_kvm.KVMHypervisor,
   constants.HT_CHROOT: hv_chroot.ChrootManager,
   constants.HT_LXC: hv_lxc.LXCHypervisor,
+  constants.HT_DOCKER: hv_docker.DockerHypervisor
   }
 
 
