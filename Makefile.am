@@ -539,7 +539,8 @@ hypervisor_PYTHON = \
 	lib/hypervisor/hv_chroot.py \
 	lib/hypervisor/hv_fake.py \
 	lib/hypervisor/hv_lxc.py \
-	lib/hypervisor/hv_xen.py
+	lib/hypervisor/hv_xen.py \
+	lib/hypervisor/hv_docker.py
 
 hypervisor_hv_kvm_PYTHON = \
 	lib/hypervisor/hv_kvm/__init__.py \
