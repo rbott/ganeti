@@ -3995,8 +3995,8 @@ ssHvparamsXenLxc = ssHvparamsPref ++ htLxc
 ssHvparamsXenPvm :: String
 ssHvparamsXenPvm = ssHvparamsPref ++ htXenPvm
 
-sshHvparamsDocker :: String
-sshHvparamsDocker = sshHvparamsPref ++ htDocker
+ssHvparamsDocker :: String
+ssHvparamsDocker = ssHvparamsPref ++ htDocker
 
 validSsHvparamsKeys :: FrozenSet String
 validSsHvparamsKeys =
