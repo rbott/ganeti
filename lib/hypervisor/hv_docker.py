@@ -90,7 +90,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     else:
       state = hv_base.HvInstanceState.SHUTDOWN
 
-    return (instance_name, container.attrs['id'], 0, 0, state, 0)
+    return (instance_name, container.attrs['Id'], 0, 0, state, 0)
 
   def GetAllInstancesInfo(self, hvparams=None):
     """Get properties of all instances.
