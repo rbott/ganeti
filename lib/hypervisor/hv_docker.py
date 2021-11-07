@@ -91,7 +91,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
       state = hv_base.HvInstanceState.SHUTDOWN
     
     stats = container.stats(stream=False)
-    memory = stats['memory_stats']['usage']
+    memory = stats['memory_stats']['usage'] / 1024 / 1024
 
     return (instance_name, container.attrs['Id'], memory, 0, state, 0)
 
