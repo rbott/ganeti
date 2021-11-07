@@ -480,6 +480,7 @@ $(THH.declareLADT ''String "Hypervisor"
   , ("XenHvm", "xen-hvm")
   , ("Lxc",    "lxc")
   , ("Fake",   "fake")
+  , ("Docker", "docker")
   ])
 $(THH.makeJSONInstance ''Hypervisor)
 
