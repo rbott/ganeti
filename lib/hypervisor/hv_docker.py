@@ -83,7 +83,15 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     @return: tuple of (name, id, memory, vcpus, stat, times)
 
     """
-    return None
+    data = []
+    container = self.docker.containers.get('/%s' % instance_name)
+
+    if container['State']['Running']:
+      running = True
+    else:
+      running = False
+
+    return (instance_name, container['id'], 0, 0, running, 0)
 
   def GetAllInstancesInfo(self, hvparams=None):
     """Get properties of all instances.
@@ -94,7 +102,9 @@ class DockerHypervisor(hv_base.BaseHypervisor):
 
     """
     data = []
-
+    for container in self.docker.containers.list():
+      data.append(self.GetInstanceInfo(container.attrs['Name'][1:]))
+    logging.info("Running containers: %s" % (data))
     return data
 
   def StartInstance(self, instance, block_devices, startup_paused):
