@@ -135,7 +135,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
                                        hvp[constants.HV_DOCKER_TAG]))
     self.docker.containers.run("%s:%s" % (hvp[constants.HV_DOCKER_IMAGE],
                                           hvp[constants.HV_DOCKER_TAG]),
-                               detach=True, name=instance.name)
+                               detach=True, name=instance.name, remove=True)
 
 
   def StopInstance(self, instance, force=False, retry=False, name=None,
