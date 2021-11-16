@@ -141,9 +141,14 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     dir, if it exist, otherwise we raise an exception.
 
     """
-    container = self.docker.containers.get(instance.name)
+    if name is None:
+      instance_name = instance.name
+    else:
+      instance_name = name
     
-    logging.info("Stopping container %s" % instance.name)
+    container = self.docker.containers.get(instance_name)
+    
+    logging.info("Stopping container %s" % instance_name)
     
     if container.attrs['State']['Running']:
       container.stop()
