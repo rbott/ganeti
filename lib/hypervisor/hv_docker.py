@@ -101,6 +101,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
       vcpus = 1
     else:
       logging.info("no, its not")
+      return None
       state = hv_base.HvInstanceState.SHUTDOWN
     
     return (instance_name, id, memory, vcpus, state, 0)
