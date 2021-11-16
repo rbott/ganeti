@@ -100,7 +100,12 @@ class DockerHypervisor(hv_base.BaseHypervisor):
       id = container.attrs['Id']
       state = hv_base.HvInstanceState.RUNNING
       memory = int(container.attrs['HostConfig']['Memory'] / 1024 / 1024)
-      vcpus = 1
+      cpu_period = container.attrs['HostConfig']['CpuPeriod']
+      cpu_quota = container.attrs['HostConfig']['CpuQuota']
+      
+      if cpu_period > 0:
+        vcpus = int(cpu_quota / cpu_period)
+      
     else:
       logging.info("no, its not")
       return None
