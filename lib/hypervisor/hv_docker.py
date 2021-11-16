@@ -136,7 +136,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     memory_in_mb = "%dM" % be[constants.BE_MAXMEM]
     
     cpu_period = 100000
-    cpu_quota = be[constants.BE_VCUPS] * 100000
+    cpu_quota = be[constants.BE_VCPUS] * 100000
 
     logging.info("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
                                            hvp[constants.HV_DOCKER_TAG]))
