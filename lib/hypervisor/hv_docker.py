@@ -134,7 +134,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     hvp = instance.hvparams
     be = instance.beparams
 
-    loggin.info("Setting Memory to %d" % be[constants.BE_MAXMEM])
+    logging.info("Setting Memory to %d" % be[constants.BE_MAXMEM])
     logging.info("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
                                            hvp[constants.HV_DOCKER_TAG]))
     self.docker.images.pull("%s:%s" % (hvp[constants.HV_DOCKER_IMAGE],
