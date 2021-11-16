@@ -99,8 +99,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
       logging.info("yep, it is")
       id = container.attrs['Id']
       state = hv_base.HvInstanceState.RUNNING
-      stats = container.stats(stream=False)
-      memory = stats['memory_stats']['usage'] / 1024 / 1024
+      memory = container.attrs['Hostconfig']['Memory']
       vcpus = 1
     else:
       logging.info("no, its not")
