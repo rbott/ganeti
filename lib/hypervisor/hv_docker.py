@@ -143,6 +143,8 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     """
     container = self.docker.containers.get(instance.name)
     
+    logging.info("Stopping container %s" % instance.name)
+    
     if container.attrs['State']['Running']:
       container.stop()
     
