@@ -146,7 +146,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
                                           hvp[constants.HV_DOCKER_TAG]),
                                detach=True, name=instance.name, remove=True,
                                mem_limit=memory_in_mb,
-                               cpu_period=cpu_period, cpu_quota = cpu_quota)
+                               cpu_period=cpu_period, cpu_quota=cpu_quota)
 
 
   def StopInstance(self, instance, force=False, retry=False, name=None,
