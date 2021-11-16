@@ -88,18 +88,22 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     container = self.docker.containers.get(instance_name)
        
     memory = 0
+    id = -1
+    vcpus = 0
 
     logging.info("Checking if that container is running...")
     if container.attrs['State']['Running']:
       logging.info("yep, it is")
+      id = container.attrs['Id']
       state = hv_base.HvInstanceState.RUNNING
       stats = container.stats(stream=False)
       memory = stats['memory_stats']['usage'] / 1024 / 1024
+      vcpus = 1
     else:
       logging.info("no, its not")
       state = hv_base.HvInstanceState.SHUTDOWN
     
-    return (instance_name, container.attrs['Id'], memory, 0, state, 0)
+    return (instance_name, id, memory, vcpus, state, 0)
 
   def GetAllInstancesInfo(self, hvparams=None):
     """Get properties of all instances.
