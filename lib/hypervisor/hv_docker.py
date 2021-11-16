@@ -100,6 +100,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
       id = container.attrs['Id']
       state = hv_base.HvInstanceState.RUNNING
       memory = container.attrs['Hostconfig']['Memory']
+      logging.info("RUNNING MEMORY: %d" % memory)
       vcpus = 1
     else:
       logging.info("no, its not")
