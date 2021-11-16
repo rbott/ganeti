@@ -142,7 +142,9 @@ class DockerHypervisor(hv_base.BaseHypervisor):
 
     """
     container = self.docker.containers.get(instance.name)
-    container.stop()
+    
+    if container.attrs['State']['Running']:
+      container.stop()
     
 
   def RebootInstance(self, instance):
