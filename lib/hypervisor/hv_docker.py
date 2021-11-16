@@ -134,6 +134,9 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     be = instance.beparams
     
     memory_in_mb = "%dM" % be[constants.BE_MAXMEM]
+    
+    cpu_period = 100000
+    cpu_quota = be[constants.BE_VCUPS] * 100000
 
     logging.info("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
                                            hvp[constants.HV_DOCKER_TAG]))
@@ -142,7 +145,8 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     self.docker.containers.run("%s:%s" % (hvp[constants.HV_DOCKER_IMAGE],
                                           hvp[constants.HV_DOCKER_TAG]),
                                detach=True, name=instance.name, remove=True,
-                               mem_limit=memory_in_mb)
+                               mem_limit=memory_in_mb,
+                               cpu_period=cpu_period, cpu_quota = cpu_quota)
 
 
   def StopInstance(self, instance, force=False, retry=False, name=None,
