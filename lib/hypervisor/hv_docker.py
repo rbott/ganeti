@@ -83,13 +83,16 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     @return: tuple of (name, id, memory, vcpus, stat, times)
 
     """
-    
-    logging.info("Trying to get info about container %s" % instance_name)
-    container = self.docker.containers.get(instance_name)
        
     memory = 0
     id = -1
     vcpus = 0
+    
+    logging.info("Trying to get info about container %s" % instance_name)
+    try:
+      container = self.docker.containers.get(instance_name)
+    except docker.errors.NotFound as e:
+      return None
 
     logging.info("Checking if that container is running...")
     if container.attrs['State']['Running']:
