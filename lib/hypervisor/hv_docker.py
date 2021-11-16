@@ -85,7 +85,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     """
     
     logging.info("Trying to get info about container %s" % instance_name)
-    container = self.docker.containers.get('/%s' % instance_name)
+    container = self.docker.containers.get(instance_name)
        
     memory = 0
 
@@ -141,7 +141,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     dir, if it exist, otherwise we raise an exception.
 
     """
-    container = self.docker.containers.get('/%s' % instance.name)
+    container = self.docker.containers.get(instance.name)
     container.stop()
     
 
