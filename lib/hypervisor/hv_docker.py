@@ -50,14 +50,6 @@ class DockerHypervisor(hv_base.BaseHypervisor):
 
   """
 
-  _DOCKER = "/usr/sbin/docker"
-
-  PARAMETERS =  {
-    constants.HV_DOCKER_IMAGE: hv_base.REQUIRED_CHECK,
-    constants.HV_DOCKER_TAG: hv_base.REQUIRED_CHECK
-  }
-
-
   def __init__(self):
     hv_base.BaseHypervisor.__init__(self)
     self.docker = docker.from_env()
@@ -69,7 +61,6 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     names = []
     for container in self.docker.containers.list():
       names.append(container.attrs['Name'][1:])
-    logging.info("Running containers: %s" % (names))
     return names
 
   def GetInstanceInfo(self, instance_name, hvparams=None):
@@ -83,34 +74,29 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     @return: tuple of (name, id, memory, vcpus, stat, times)
 
     """
-       
+
     memory = 0
     id = -1
     vcpus = 0
-    
-    logging.info("Trying to get info about container %s" % instance_name)
+
     try:
       container = self.docker.containers.get(instance_name)
     except docker.errors.NotFound as e:
       return None
 
-    logging.info("Checking if that container is running...")
     if container.attrs['State']['Running']:
-      logging.info("yep, it is")
       id = container.attrs['Id']
       state = hv_base.HvInstanceState.RUNNING
       memory = int(container.attrs['HostConfig']['Memory'] / 1024 / 1024)
       cpu_period = container.attrs['HostConfig']['CpuPeriod']
       cpu_quota = container.attrs['HostConfig']['CpuQuota']
-      
+
       if cpu_period > 0:
         vcpus = int(cpu_quota / cpu_period)
-      
+
     else:
-      logging.info("no, its not")
       return None
-      state = hv_base.HvInstanceState.SHUTDOWN
-    
+
     return (instance_name, id, memory, vcpus, state, 0)
 
   def GetAllInstancesInfo(self, hvparams=None):
@@ -124,7 +110,6 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     data = []
     for container in self.docker.containers.list():
       data.append(self.GetInstanceInfo(container.attrs['Name'][1:]))
-    logging.info("Running containers: %s" % (data))
     return data
 
   def StartInstance(self, instance, block_devices, startup_paused):
@@ -137,13 +122,13 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     """
     hvp = instance.hvparams
     be = instance.beparams
-    
+
     memory_in_mb = "%dM" % be[constants.BE_MAXMEM]
-    
+
     cpu_period = 100000
     cpu_quota = be[constants.BE_VCPUS] * 100000
 
-    logging.info("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
+    logging.debug("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
                                            hvp[constants.HV_DOCKER_TAG]))
     self.docker.images.pull("%s:%s" % (hvp[constants.HV_DOCKER_IMAGE],
                                        hvp[constants.HV_DOCKER_TAG]))
@@ -163,14 +148,12 @@ class DockerHypervisor(hv_base.BaseHypervisor):
       instance_name = instance.name
     else:
       instance_name = name
-    
+
     container = self.docker.containers.get(instance_name)
-    
-    logging.info("Stopping container %s" % instance_name)
-    
+
     if container.attrs['State']['Running']:
       container.stop()
-    
+
 
   def RebootInstance(self, instance):
     """Reboot an instance.
