@@ -218,6 +218,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     """
 
     msgs = []
+    logging.info("Trying to PING the docker daemon")
     try:
       self.docker.ping()
     except docker.errors.APIError as e:
