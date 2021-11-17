@@ -140,7 +140,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
       path = bdev[1]
       mountpoint = "/root"
       volumes.append(Mount(mountpoint, path, type='volume',
-                           read_only=False, 
+                           read_only=False,
                            driver_config=DriverConfig(
                              'local',
                              {'type': 'ext4', 'device': path, })))
