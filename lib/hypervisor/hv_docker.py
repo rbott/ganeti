@@ -139,7 +139,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     for bdev in block_devices:
       path = os.readlink(bdev[1])
       mountpoint = "/root"
-      volumes.append(Mount(mountpoint, path, type='volume',
+      volumes.append(Mount(mountpoint, None, type='volume',
                            read_only=False,
                            driver_config=DriverConfig(
                              'local',
