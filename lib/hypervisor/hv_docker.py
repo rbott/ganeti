@@ -158,9 +158,6 @@ class DockerHypervisor(hv_base.BaseHypervisor):
                    timeout=None):
     """Stop an instance.
 
-    For the fake hypervisor, this just removes the file in the base
-    dir, if it exist, otherwise we raise an exception.
-
     """
     if name is None:
       instance_name = instance.name
@@ -178,10 +175,10 @@ class DockerHypervisor(hv_base.BaseHypervisor):
   def RebootInstance(self, instance):
     """Reboot an instance.
 
-    For the fake hypervisor, this does nothing.
-
     """
-    return
+    container = self.docker.containers.get(instance.name)
+    
+    container.restart()
 
   def GetNodeInfo(self, hvparams=None):
     """Return information about the node.
@@ -207,6 +204,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
                                    message=("Console not available for fake"
                                             " hypervisor"))
 
+
   def Verify(self, hvparams=None):
     """Verify the hypervisor.
 
@@ -218,9 +216,11 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     @return: Problem description if something is wrong, C{None} otherwise
 
     """
-    docker_check = utils.RunCmd([self._DOCKER, "version"])
 
-    if docker_check.failed:
-      return "Failed to run '%s --version'" % (self._DOCKER)
-    
-    return None
+    msgs = []
+    try:
+      self.docker.ping()
+    except docker.errors.APIError as e:
+      msgs.append("The docker daemon is not responding: %s", e)
+
+    return self._FormatVerifyResults(msgs)
