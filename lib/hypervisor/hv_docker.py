@@ -37,6 +37,7 @@ import os.path
 import logging
 import docker
 
+from docker.types import Mount,DriverConfig
 from ganeti import utils
 from ganeti import constants
 from ganeti import objects
@@ -133,7 +134,17 @@ class DockerHypervisor(hv_base.BaseHypervisor):
 
     cpu_period = 100000
     cpu_quota = be[constants.BE_VCPUS] * 100000
-    logging.debug(block_devices)
+    
+    volumes = []
+    for bdev in block_devices:
+      path = bdev[1]
+      mountpoint = "/root"
+      volumes.append(Mount(mountpoint, path, type='volume',
+                           read_only=False, 
+                           driver_config=DriverConfig(
+                             'local',
+                             {'type': 'ext4', 'device': path, })))
+
     logging.debug("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
                                            hvp[constants.HV_DOCKER_TAG]))
     self.docker.images.pull("%s:%s" % (hvp[constants.HV_DOCKER_IMAGE],
@@ -142,7 +153,8 @@ class DockerHypervisor(hv_base.BaseHypervisor):
                                           hvp[constants.HV_DOCKER_TAG]),
                                detach=True, name=instance.name, remove=True,
                                mem_limit=memory_in_mb,
-                               cpu_period=cpu_period, cpu_quota=cpu_quota)
+                               cpu_period=cpu_period, cpu_quota=cpu_quota,
+                               mounts=volumes)
 
 
   def StopInstance(self, instance, force=False, retry=False, name=None,
