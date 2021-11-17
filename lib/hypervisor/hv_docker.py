@@ -133,7 +133,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
 
     cpu_period = 100000
     cpu_quota = be[constants.BE_VCPUS] * 100000
-
+    logging.debug(block_devices)
     logging.debug("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
                                            hvp[constants.HV_DOCKER_TAG]))
     self.docker.images.pull("%s:%s" % (hvp[constants.HV_DOCKER_IMAGE],
@@ -207,7 +207,6 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     """
 
     msgs = []
-    logging.info("Trying to PING the docker daemon")
     try:
       self.docker.ping()
     except docker.errors.APIError as e:
