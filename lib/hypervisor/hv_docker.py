@@ -119,6 +119,25 @@ class DockerHypervisor(hv_base.BaseHypervisor):
       data.append(self.GetInstanceInfo(container.attrs['Name'][1:]))
     return data
 
+  def _create_mounts(self, block_devices):
+    """Prepare a list of Mount objects for the container.run() function
+
+    """
+    volumes = []
+    for bdev in block_devices:
+      path = os.readlink(bdev[1])
+      mountpoint = bdev[0].name
+      volumes.append(Mount(mountpoint, None, type='volume',
+                           read_only=False,
+                           driver_config=DriverConfig(
+                             'local',
+                             {'type': 'ext4', 'device': path, })))
+
+    return volumes
+
+  def _check_and_create_filesystems(self, mounts):
+    pass
+
   def StartInstance(self, instance, block_devices, startup_paused):
     """Start an instance.
 
@@ -135,15 +154,8 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     cpu_period = 100000
     cpu_quota = be[constants.BE_VCPUS] * 100000
     
-    volumes = []
-    for bdev in block_devices:
-      path = os.readlink(bdev[1])
-      mountpoint = bdev[0].name
-      volumes.append(Mount(mountpoint, None, type='volume',
-                           read_only=False,
-                           driver_config=DriverConfig(
-                             'local',
-                             {'type': 'ext4', 'device': path, })))
+    mounts = self._create_mounts(block_devices)
+    self._check_and_create_filesystems(mounts)
 
     logging.debug("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
                                            hvp[constants.HV_DOCKER_TAG]))
@@ -154,7 +166,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
                                detach=True, name=instance.name, remove=True,
                                mem_limit=memory_in_mb,
                                cpu_period=cpu_period, cpu_quota=cpu_quota,
-                               mounts=volumes)
+                               mounts=mounts)
 
 
   def StopInstance(self, instance, force=False, retry=False, name=None,
