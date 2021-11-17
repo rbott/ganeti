@@ -135,6 +135,7 @@ class DockerHypervisor(hv_base.BaseHypervisor):
     cpu_period = 100000
     cpu_quota = be[constants.BE_VCPUS] * 100000
     
+    logging.debug(block_devices)
     volumes = []
     for bdev in block_devices:
       path = os.readlink(bdev[1])
