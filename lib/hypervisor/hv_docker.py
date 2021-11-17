@@ -50,6 +50,12 @@ class DockerHypervisor(hv_base.BaseHypervisor):
 
   """
 
+  PARAMETERS =  {
+    constants.HV_DOCKER_IMAGE: hv_base.NO_CHECK,
+    constants.HV_DOCKER_TAG: hv_base.NO_CHECK
+  }
+
+
   def __init__(self):
     hv_base.BaseHypervisor.__init__(self)
     self.docker = docker.from_env()
