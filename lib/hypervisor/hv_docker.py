@@ -138,6 +138,12 @@ class DockerHypervisor(hv_base.BaseHypervisor):
   def _check_and_create_filesystems(self, mounts):
     pass
 
+
+  def _setup_networking(self, nics):
+    logging.debug(nics)
+    pass
+
+
   def StartInstance(self, instance, block_devices, startup_paused):
     """Start an instance.
 
@@ -153,9 +159,10 @@ class DockerHypervisor(hv_base.BaseHypervisor):
 
     cpu_period = 100000
     cpu_quota = be[constants.BE_VCPUS] * 100000
-    
+
     mounts = self._create_mounts(block_devices)
     self._check_and_create_filesystems(mounts)
+    self._setup_networking(instance.nics)
 
     logging.debug("Pulling image '%s:%s'" %(hvp[constants.HV_DOCKER_IMAGE],
                                            hvp[constants.HV_DOCKER_TAG]))
