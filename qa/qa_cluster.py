@@ -171,6 +171,7 @@ def PrepareHvParameterSets():
 
   for param, values in toggle_value_params.items():
     list_values = list(values)
+    print(qa_logging.FormatInfo("PrepareHvParameterSets(): Trying to remove %s from %s" % (hv_params[param], list_values)))
     list_values.remove(hv_params[param])
     assembled_tests[param] = {
       "values": list_values,
