@@ -59,7 +59,7 @@ import Ganeti.Utils
 getDomainsInfo :: IO (BT.Result (Map.Map String Domain))
 getDomainsInfo = do
   contents <-
-        (E.try $ readProcess C.xenCmdXm ["list", "--long"] "")
+        (E.try $ readProcess "xl" ["list", "--long"] "")
           :: IO (Either IOError String)
   return $
     either (BT.Bad . show) (
@@ -102,7 +102,7 @@ getInferredDomInfo = do
 getUptimeInfo :: IO (Map.Map Int UptimeInfo)
 getUptimeInfo = do
   contents <-
-    ((E.try $ readProcess C.xenCmdXm ["uptime"] "")
+    ((E.try $ readProcess "xl" ["uptime"] "")
       :: IO (Either IOError String)) >>=
       exitIfBad "running command" . either (BT.Bad . show) BT.Ok
   case A.parseOnly xmUptimeParser $ pack contents of

@@ -859,7 +859,7 @@ class XenHypervisor(hv_base.BaseHypervisor):
     @return: list of tuples (name, id, memory, vcpus, state, times)
 
     """
-    return self._GetInstanceList(False, hvparams)
+    return self._GetInstanceList(False)
 
   def _MakeConfigFile(self, instance, startup_memory, block_devices):
     """Gather configuration details and write to disk.
@@ -1126,7 +1126,7 @@ class XenHypervisor(hv_base.BaseHypervisor):
                     result.fail_reason, result.output)
       return None
 
-    instance_list = self._GetInstanceList(True, hvparams)
+    instance_list = self._GetInstanceList(True)
     return _GetNodeInfo(result.stdout, instance_list)
 
   @classmethod
@@ -1163,8 +1163,7 @@ class XenHypervisor(hv_base.BaseHypervisor):
     try:
       self._CheckToolstackXlConfigured()
     except errors.HypervisorError:
-      return "The configured xen toolstack 'xl' is not available on this" \
-             " node."
+      return "The xen toolstack 'xl' is not available on this node."
 
     result = self._RunXen(["info"])
     if result.failed:
@@ -1384,7 +1383,7 @@ class XenHypervisor(hv_base.BaseHypervisor):
       xen_cmd = XEN_COMMAND
       utils.RunCmd([xen_cmd, "debug", "R"])
 
-   def _CheckToolstackXlConfigured(self):
+  def _CheckToolstackXlConfigured(self):
     """Checks whether xl is enabled on an xl-capable node.
 
     @rtype: bool
