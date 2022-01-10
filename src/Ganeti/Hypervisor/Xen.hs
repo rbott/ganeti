@@ -48,7 +48,7 @@ import System.Process
 import qualified Ganeti.BasicTypes as BT
 import qualified Ganeti.Constants as C
 import Ganeti.Hypervisor.Xen.Types
-import Ganeti.Hypervisor.Xen.XmParser
+import Ganeti.Hypervisor.Xen.XlParser
 import Ganeti.Logging
 import Ganeti.Utils
 

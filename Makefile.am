@@ -948,7 +948,7 @@ HS_LIB_SRCS = \
 	src/Ganeti/HTools/Tags/Constants.hs \
 	src/Ganeti/HTools/Types.hs \
 	src/Ganeti/Hypervisor/Xen.hs \
-	src/Ganeti/Hypervisor/Xen/XmParser.hs \
+	src/Ganeti/Hypervisor/Xen/XlParser.hs \
 	src/Ganeti/Hypervisor/Xen/Types.hs \
 	src/Ganeti/Hash.hs \
 	src/Ganeti/Hs2Py/GenConstants.hs \
@@ -1097,7 +1097,7 @@ HS_TEST_SRCS = \
 	test/hs/Test/Ganeti/HTools/Node.hs \
 	test/hs/Test/Ganeti/HTools/PeerMap.hs \
 	test/hs/Test/Ganeti/HTools/Types.hs \
-	test/hs/Test/Ganeti/Hypervisor/Xen/XmParser.hs \
+	test/hs/Test/Ganeti/Hypervisor/Xen/XlParser.hs \
 	test/hs/Test/Ganeti/JSON.hs \
 	test/hs/Test/Ganeti/Jobs.hs \
 	test/hs/Test/Ganeti/JQScheduler.hs \
