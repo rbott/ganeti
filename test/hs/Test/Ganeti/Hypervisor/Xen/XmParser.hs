@@ -178,7 +178,7 @@ prop_uptimeInfo uInfo =
 
 -- | Test a Xen 4.0.1 @xm list --long@ output.
 case_xen401list :: Assertion
-case_xen401list = testDomain "xen-xm-list-long-4.0.1.txt" $
+case_xen401list = testDomain "xen-xl-list-long-4.0.1.txt" $
   Map.fromList
     [ ("Domain-0", Domain 0 "Domain-0" 184000.41332 ActualRunning Nothing)
     , ("instance1.example.com", Domain 119 "instance1.example.com" 24.116146647
@@ -187,7 +187,7 @@ case_xen401list = testDomain "xen-xm-list-long-4.0.1.txt" $
 
 -- | Test a Xen 4.0.1 @xm uptime@ output.
 case_xen401uptime :: Assertion
-case_xen401uptime = testUptimeInfo "xen-xm-uptime-4.0.1.txt" $
+case_xen401uptime = testUptimeInfo "xen-xl-uptime-4.0.1.txt" $
   Map.fromList
     [ (0, UptimeInfo "Domain-0" 0 "98 days,  2:27:44")
     , (119, UptimeInfo "instance1.example.com" 119 "15 days, 20:57:07")
