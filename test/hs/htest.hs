@@ -138,7 +138,7 @@ allTests =
   , testHTools_Node
   , testHTools_PeerMap
   , testHTools_Types
-  , testHypervisor_Xen_XmParser
+  , testHypervisor_Xen_XlParser
   , testJSON
   , testJobs
   , testJQueue

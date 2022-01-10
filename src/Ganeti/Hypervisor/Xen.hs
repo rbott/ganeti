@@ -64,7 +64,7 @@ getDomainsInfo = do
   return $
     either (BT.Bad . show) (
       \c ->
-        case A.parseOnly xmListParser $ pack c of
+        case A.parseOnly xlListParser $ pack c of
           Left msg -> BT.Bad msg
           Right dom -> BT.Ok dom
       ) contents
@@ -105,6 +105,6 @@ getUptimeInfo = do
     ((E.try $ readProcess "xl" ["uptime"] "")
       :: IO (Either IOError String)) >>=
       exitIfBad "running command" . either (BT.Bad . show) BT.Ok
-  case A.parseOnly xmUptimeParser $ pack contents of
+  case A.parseOnly xlUptimeParser $ pack contents of
     Left msg -> exitErr msg
     Right uInfo -> return uInfo
