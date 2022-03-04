@@ -834,6 +834,13 @@ class QmpConnection(MonitorSocket):
     return self.Execute("query-migrate")
 
   @_ensure_connection
+  def SetBalloonMemory(self, memory):
+    balloon_status = self.Execute("query-balloon")
+    logging.info(balloon_status)
+    #self.Execute("balloon", { "value": memory })
+    return True
+
+  @_ensure_connection
   def SetSpicePassword(self, spice_pwd):
     """Set Spice password of an instance
 

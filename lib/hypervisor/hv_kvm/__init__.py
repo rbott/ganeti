@@ -1081,6 +1081,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     @return: (name, id, memory, vcpus, stat, times)
 
     """
+    logging.info("Entering GetInstanceInfo()")
     _, pid, alive = self._InstancePidAlive(instance_name)
     if not alive:
       if self._IsUserShutdown(instance_name):
@@ -1096,11 +1097,16 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       qmp = QmpConnection(self._InstanceQmpMonitor(instance_name))
       qmp.connect()
       vcpus = len(qmp.Execute("query-cpus"))
+      logging.info("Retrieved number of CPUs from QEMU: %d" % vcpus)
       # Will fail if ballooning is not enabled, but we can then just resort to
       # the value above.
       mem_bytes = qmp.Execute("query-balloon")[qmp.ACTUAL_KEY]
       memory = mem_bytes // 1048576
-    except errors.HypervisorError:
+      logging.info("Retriev amount of operational memory from QEMU: %d" %
+                   memory)
+    except errors.HypervisorError as e:
+      logging.info("WARNINGWARNING: Fetching VCPUs and Memory threw a "
+                   "HypervisorError: %s" % e)
       pass
 
     return (instance_name, pid, memory, vcpus, istat, times)
@@ -2682,6 +2688,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
     return objects.MigrationStatus(status=constants.HV_MIGRATION_FAILED)
 
+  @_with_qmp
   def BalloonInstanceMemory(self, instance, mem):
     """Balloon an instance memory to a certain value.
 
@@ -2691,7 +2698,9 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     @param mem: actual memory size to use for instance runtime
 
     """
-    self._CallMonitorCommand(instance.name, "balloon %d" % mem)
+    balloon = self.qmp.SetBalloonMemory(mem)
+    logging.info("qmp.SetBalloonMemory returned: %s" % balloon)
+    #self._CallMonitorCommand(instance.name, "balloon %d" % mem)
 
   def GetNodeInfo(self, hvparams=None):
     """Return information about the node.
