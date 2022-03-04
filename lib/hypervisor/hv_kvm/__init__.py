@@ -1135,11 +1135,11 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     @param disk_cache: the instance's disk cache parameter
     @type dev_type: string
     @param dev_type: the disk type in use
-    @rtype: string
-    @return: parameter string suitable for QEMU drive parameters
+    @rtype: dict
+    @return: dictionary with aio and optionally cache parameters
 
     """
-
+    parameters = {}
     if (dev_type in constants.DTS_EXT_MIRROR
             and dev_type != constants.DT_RBD):
       logging.warning("KVM: overriding disk_cache setting '%s' with 'none'"
@@ -1152,12 +1152,34 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       disk_aio = constants.HT_KVM_AIO_THREADS
 
     if disk_aio == constants.HT_KVM_AIO_NATIVE:
-      return ",aio=native,cache=none"
+      return {"aio": "native", "cache": "none"}
     else:
       if disk_cache == constants.HT_CACHE_DEFAULT:
-        return ",aio=threads"
+        return {"aio": "threads"}
       else:
-        return ",aio=threads,cache=%s" % disk_cache
+        return {"aio": "threads", "cache": "%s" % disk_cache}
+
+  @staticmethod
+  def _GenerateDiskAioCacheParametersString(disk_aio, disk_cache, dev_type):
+    """Generate appropriate aio/cache parameters for QEMU
+
+    @type disk_aio: string
+    @param disk_aio: the instance's AIO parameter
+    @type disk_cache: string
+    @param disk_cache: the instance's disk cache parameter
+    @type dev_type: string
+    @param dev_type: the disk type in use
+    @rtype: string
+    @return: parameter string suitable for QEMU drive parameters
+
+    """
+    params = KVMHypervisor._GenerateDiskAioCacheParameters(disk_aio, disk_cache, dev_type)
+
+    param_string = ",aio=%s" % params["aio"]
+    if "cache" in params:
+      param_string += ",cache=%s" % params["cache"]
+
+    return param_string
 
   def _GenerateKVMBlockDevicesOptions(self, up_hvp, kvm_disks,
                                       kvmhelp, devlist):
@@ -1212,7 +1234,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     # Cache mode
     disk_cache = up_hvp[constants.HV_DISK_CACHE]
     for cfdev, link_name, uri in kvm_disks:
-      aio_cache_val = self._GenerateDiskAioCacheParameters(
+      aio_cache_val = self._GenerateDiskAioCacheParametersString(
         up_hvp[constants.HV_KVM_DISK_AIO], up_hvp[constants.HV_DISK_CACHE],
         cfdev.dev_type)
       if cfdev.mode != constants.DISK_RDWR:
@@ -2037,8 +2059,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       utils.WriteFile(self._InstanceNICFile(instance.name, nic_seq), data=tap)
 
     if vnc_pwd:
-      change_cmd = "change vnc password %s" % vnc_pwd
-      self._CallMonitorCommand(instance.name, change_cmd)
+      self.qmp.SetVncPassword(vnc_pwd)
 
     # Setting SPICE password. We are not vulnerable to malicious passwordless
     # connection attempts because SPICE by default does not allow connections
@@ -2281,33 +2302,16 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     if dev_type == constants.HOTPLUG_TARGET_DISK:
       uri = _GetDriveURI(device, extra[0], extra[1])
 
-      disable_auto_ro = self.qmp.HasDynamicAutoReadOnly()
+      extra_arguments = self._GenerateDiskAioCacheParameters(
+        up_hvp[constants.HV_KVM_DISK_AIO], up_hvp[constants.HV_DISK_CACHE],
+        device_type)
+      if up_hvp[constants.HV_DISK_DISCARD] != constants.HT_DISCARD_DEFAULT:
+        extra_arguments["discard"] = "%s" % up_hvp[constants.HV_DISK_DISCARD]
 
-      def drive_add_fn(filename):
-        """Helper function that uses HMP to hot-add a drive."""
-        cmd = "drive_add dummy file=%s,if=none,id=%s,format=raw" % \
-          (filename, kvm_devid)
-        if disable_auto_ro:
-          # This is necessary for the drive_add/device_add combination to work
-          # after QEMU 4.0. auto-read-only first appeared in 3.1, but 4.0
-          # changed its behavior in a way that breaks hotplugging. See #1547.
-          cmd += ",auto-read-only=off"
-        # When hot plugging a disk, parameters should match the current runtime.
-        # I.e. for live migration, the cache mode is critical.
-        cmd += self._GenerateDiskAioCacheParameters(
-          up_hvp[constants.HV_KVM_DISK_AIO], up_hvp[constants.HV_DISK_CACHE],
-          device_type)
-        if up_hvp[constants.HV_DISK_DISCARD] != constants.HT_DISCARD_DEFAULT:
-          cmd += ",discard=%s" % up_hvp[constants.HV_DISK_DISCARD]
-        self._CallMonitorCommand(instance.name, cmd)
+      if self.qmp.HasDynamicAutoReadOnly():
+        extra_arguments["auto-read-only"] = False
 
-      # This must be done indirectly due to the fact that we pass the drive's
-      # file descriptor via QMP first, then we add the corresponding drive that
-      # refers to this fd. Note that if the QMP connection terminates before
-      # a drive which keeps a reference to the fd passed via the add-fd QMP
-      # command has been created, then the fd gets closed and cannot be used
-      # later (e.g., via an drive_add HMP command).
-      self.qmp.HotAddDisk(device, kvm_devid, uri, drive_add_fn)
+      self.qmp.HotAddDisk(device, kvm_devid, uri, extra_arguments)
     elif dev_type == constants.HOTPLUG_TARGET_NIC:
       kvmpath = instance.hvparams[constants.HV_KVM_PATH]
       is_chrooted = instance.hvparams[constants.HV_KVM_USE_CHROOT]
@@ -2433,8 +2437,30 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     else:
       return "pc"
 
-  @classmethod
-  def _StopInstance(cls, instance, force=False, name=None, timeout=None):
+  def _TimeoutOrKill(self, timeout, name):
+    """Wait for QEMU to shut down after timeout or kill it
+
+    """
+    _, pid, alive = self._InstancePidAlive(name)
+    if timeout is not None:
+      tick = 0
+      while tick < timeout:
+        _, _, alive = self._InstancePidAlive(name)
+        if not alive:
+          logging.info("KVM: instance %s finished shutdown after %d seconds"
+                       % (name, tick + 1))
+          break
+        tick += 1
+        time.sleep(1)
+
+    if alive:
+      logging.warning("KVM: instance %s did not shut down within the "
+                      "timeout of %d seconds, killing the process now"
+                      % (name, timeout))
+      utils.KillProcess(pid)
+
+  @_with_qmp
+  def _StopInstance(self, instance, force=False, name=None, timeout=None):
     """Stop an instance.
 
     """
@@ -2447,13 +2473,15 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       acpi = instance.hvparams[constants.HV_ACPI]
     else:
       acpi = False
-    _, pid, alive = cls._InstancePidAlive(name)
+    _, pid, alive = self._InstancePidAlive(name)
     if pid > 0 and alive:
       if force or not acpi:
         utils.KillProcess(pid)
       else:
-        cls._CallMonitorCommand(name, "system_powerdown", timeout)
-    cls._ClearUserShutdown(instance.name)
+        self.qmp.Powerdown()
+        self._TimeoutOrKill(timeout, name)
+
+    self._ClearUserShutdown(instance.name)
 
   def StopInstance(self, instance, force=False, retry=False, name=None,
                    timeout=None):
@@ -2682,6 +2710,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
     return objects.MigrationStatus(status=constants.HV_MIGRATION_FAILED)
 
+  @_with_qmp
   def BalloonInstanceMemory(self, instance, mem):
     """Balloon an instance memory to a certain value.
 
@@ -2691,7 +2720,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     @param mem: actual memory size to use for instance runtime
 
     """
-    self._CallMonitorCommand(instance.name, "balloon %d" % mem)
+    self.qmp.SetBalloonMemory(mem)
 
   def GetNodeInfo(self, hvparams=None):
     """Return information about the node.

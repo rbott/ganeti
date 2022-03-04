@@ -607,8 +607,9 @@ class TestDiskParameters(testutils.GanetiTestCase):
     }
 
     for name, data in test_cases.items():
-      self.assertEqual(hv_kvm.KVMHypervisor._GenerateDiskAioCacheParameters(
-        data["disk_aio"], data["disk_cache"], data["dev_type"]),
+      self.assertEqual(
+        hv_kvm.KVMHypervisor._GenerateDiskAioCacheParametersString(
+          data["disk_aio"], data["disk_cache"], data["dev_type"]),
         data["expected_string"], name)
 
 

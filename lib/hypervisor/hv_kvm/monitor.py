@@ -545,13 +545,12 @@ class QmpConnection(MonitorSocket):
     self.Execute("netdev_del", {"id": devid})
 
   @_ensure_connection
-  def HotAddDisk(self, disk, devid, uri, drive_add_fn=None):
+  def HotAddDisk(self, disk, devid, uri, extra_arguments):
     """Hot-add a disk
 
     Try opening the device to obtain a fd and pass it with SCM_RIGHTS. This
     will be omitted in case of userspace access mode (open will fail).
-    Then use blockdev-add QMP command or drive_add_fn() callback if any.
-    The add the guest device.
+    Then use blockdev-add QMP command to add the guest device.
 
     """
     if os.path.exists(uri):
@@ -565,30 +564,22 @@ class QmpConnection(MonitorSocket):
       filename = uri
       fdset = None
 
-    # FIXME: Use blockdev-add/blockdev-del when properly implemented in QEMU.
-    # This is an ugly hack to work around QEMU commits 48f364dd and da2cf4e8:
-    #  * HMP's drive_del is not supported any more on a drive added
-    #    via QMP's blockdev-add
-    #  * Stay away from immature blockdev-add unless you want to help
-    #     with development.
-    # Using drive_add here must be done via a callback due to the fact that if
-    # a QMP connection terminates before a drive keeps a reference to the fd
-    # passed via the add-fd QMP command, then the fd gets closed and
-    # cannot be used later.
-    if drive_add_fn:
-      drive_add_fn(filename)
-    else:
-      arguments = {
-        "options": {
-          "driver": "raw",
-          "id": devid,
-          "file": {
-            "driver": "file",
-            "filename": filename,
-          }
+    arguments = {
+      "options": {
+        "driver": "raw",
+        "id": devid,
+        "file": {
+          "driver": "file",
+          "filename": filename,
         }
       }
-      self.Execute("blockdev-add", arguments)
+    }
+
+    arguments["options"] = {**arguments["options"], **extra_arguments}
+
+    logging.info("Adding blockdev with the following args: %s" % arguments)
+
+    self.Execute("blockdev-add", arguments)
 
     if fdset is not None:
       self._RemoveFdset(fdset)
@@ -611,8 +602,7 @@ class QmpConnection(MonitorSocket):
 
     """
     self.Execute("device_del", {"id": devid})
-    #TODO: uncomment when drive_del gets implemented in upstream qemu
-    # self.Execute("drive_del", {"id": devid})
+    self.Execute("blockdev-del", {"node-name": devid})
 
   def _GetPCIDevices(self):
     """Get the devices of the first PCI bus of a running instance.
@@ -844,6 +834,26 @@ class QmpConnection(MonitorSocket):
     }
 
     self.Execute("set_password", arguments)
+
+  @_ensure_connection
+  def SetSpicePassword(self, vnc_pwd):
+    """Set VNC password of an instance
+
+    """
+    arguments = {
+      "protocol": "vnc",
+      "password": vnc_pwd,
+    }
+
+    self.Execute("set_password", arguments)
+
+  @_ensure_connection
+  def SetBalloonMemory(self, memory):
+    self.Execute("balloon", {"value": memory * 1048576})
+
+  @_ensure_connection
+  def Powerdown(self):
+    self.Execute("system_powerdown")
 
   def _GetFd(self, fd, fdname):
     """Wrapper around the getfd qmp command
