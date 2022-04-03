@@ -1280,6 +1280,14 @@ class NodeRequestHandler(http.server.HttpServerHandler):
     """
     return backend.CleanupImportExport(params[0])
 
+  @staticmethod
+  def perspective_ping(params):
+    """Dummy function to see if noded is alive.
+
+    Mainly useful for gnt-cluster verify
+    """
+    return "Pong"
+
 
 def CheckNoded(options, args):
   """Initial checks whether to run or exit with a failure.

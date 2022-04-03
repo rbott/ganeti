@@ -626,6 +626,8 @@ _MISC_CALLS = [
   ("get_file_info", SINGLE, None, constants.RPC_TMO_FAST, [
     ("file_path", None, None),
     ], None, None, "Checks if a file exists and reports on it"),
+  ("ping", SINGLE, None, constants.RPC_TMO_NORMAL, [], None, None,
+   "Returns pong to see if noded is alive"),
   ]
 
 CALLS = {
