@@ -1267,9 +1267,8 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
     return dev_opts
 
-  @staticmethod
-  def _CdromOption(kvm_cmd, cdrom_disk_type, cdrom_image, cdrom_boot):
-    """Extends L{kvm_cmd} with the '-drive' option for a cdrom, and
+  def _CdromOption(self, kvm_cmd, cdrom_disk_type, cdrom_image, cdrom_boot, id):
+    """Extends L{kvm_cmd} with the '-blockdev/-device' options for a cdrom, and
     optionally the '-boot' option.
 
     Example: -drive file=cdrom.iso,media=cdrom,format=raw,if=ide -boot d
@@ -1278,7 +1277,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
     Example: -drive file=http://hostname.com/cdrom.iso,media=cdrom
 
-    @type kvm_cmd: string
+    @type kvm_cmd: list of str
     @param kvm_cmd: KVM command line
 
     @type cdrom_disk_type:
@@ -1290,6 +1289,9 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     @type cdrom_boot:
     @param cdrom_boot:
 
+    @type id:
+    @param id:
+
     """
     # Check that the ISO image is accessible
     # See https://bugs.launchpad.net/qemu/+bug/597575
@@ -1298,27 +1300,35 @@ class KVMHypervisor(hv_base.BaseHypervisor):
                                    cdrom_image)
 
     # set cdrom 'media' and 'format', if needed
-    if utils.IsUrl(cdrom_image):
-      options = ",media=cdrom"
-    else:
-      options = ",media=cdrom,format=raw"
+    #if utils.IsUrl(cdrom_image):
+    bdev_opts = [
+      "driver=file",
+      "cache.direct=off",
+      "cache.no-flush=on",
+      "read-only=on",
+      "node-name=%s" % id,
+      "filename=%s" % cdrom_image
+    ]
 
-    # set cdrom 'if' type
-    if cdrom_boot:
-      if_val = ",if=" + constants.HT_DISK_IDE
+    dev_opts = []
+    if cdrom_disk_type == constants.HT_DISK_IDE:
+      dev_opts.append("ide-cd")
     elif cdrom_disk_type == constants.HT_DISK_PARAVIRTUAL:
-      if_val = ",if=virtio"
+      dev_opts.append(self._VIRTIO_BLK_PCI)
+    elif cdrom_disk_type == constants.HT_DISK_SCSI_CD:
+      dev_opts.append("scsi-cd")
     else:
-      if_val = ",if=" + cdrom_disk_type
+      raise errors.HypervisorError("Unsupported cdrom disk type: %s" %
+                                   cdrom_disk_type)
 
+    dev_opts.append("drive=%s" % id)
     # set boot flag, if needed
-    boot_val = ""
     if cdrom_boot:
       kvm_cmd.extend(["-boot", "d"])
 
     # build '-drive' option
-    drive_val = "file=%s%s%s%s" % (cdrom_image, options, if_val, boot_val)
-    kvm_cmd.extend(["-drive", drive_val])
+    kvm_cmd.extend(["-blockdev", ",".join(bdev_opts),
+                    "-device",   ",".join(dev_opts)])
 
   def _GenerateKVMRuntime(self, instance, block_devices, startup_paused,
                           kvmhelp):
@@ -1367,7 +1377,9 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       soundhw = hvp[constants.HV_SOUNDHW]
       kvm_cmd.extend(["-soundhw", soundhw])
 
-    if hvp[constants.HV_DISK_TYPE] in constants.HT_SCSI_DEVICE_TYPES:
+    if hvp[constants.HV_DISK_TYPE] in constants.HT_SCSI_DEVICE_TYPES \
+            or hvp[constants.HV_KVM_CDROM_DISK_TYPE]\
+            in constants.HT_SCSI_DEVICE_TYPES:
       # In case a SCSI disk is given, QEMU adds a SCSI contorller
       # (LSI Logic / Symbios Logic 53c895a) implicitly.
       # Here, we add the controller explicitly with the default id.
@@ -1433,11 +1445,12 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
     cdrom_image1 = hvp[constants.HV_CDROM_IMAGE_PATH]
     if cdrom_image1:
-      self._CdromOption(kvm_cmd, cdrom_disk_type, cdrom_image1, boot_cdrom)
+      self._CdromOption(kvm_cmd, cdrom_disk_type, cdrom_image1, boot_cdrom,
+                        "cdrom1")
 
     cdrom_image2 = hvp[constants.HV_KVM_CDROM2_IMAGE_PATH]
     if cdrom_image2:
-      self._CdromOption(kvm_cmd, cdrom_disk_type, cdrom_image2, False, False)
+      self._CdromOption(kvm_cmd, cdrom_disk_type, cdrom_image2, False, "cdrom2")
 
     floppy_image = hvp[constants.HV_KVM_FLOPPY_IMAGE_PATH]
     if floppy_image:
