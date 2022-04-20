@@ -1267,6 +1267,38 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
     return dev_opts
 
+  def _FloppyOption(self, kvm_cmd, floppy_image, boot_floppy):
+    """Extens L{kvm_cmd} with the '-blockdev/-device' options for a floppy, and
+    optionally the '-boot' option
+
+    @type kvm_cmd: list of str
+    @param kvm_cmd: KVM command line
+
+    @type floppy_image: str
+    @param floppy_image: path to floppy image file
+
+    @type boot_floppy: bool
+    @param boot_floppy: set boot device to floppy
+
+    """
+    if boot_floppy:
+      kvm_cmd.extend(["-boot", "a"])
+
+    bdev_opts = [
+      "driver=raw",
+      "node-name=floppy1",
+      "file.driver=file",
+      "file.filename=%s" % floppy_image
+    ]
+
+    dev_opts = [
+      "floppy",
+      "drive=floppy1"
+    ]
+
+    kvm_cmd.extend(["-blockdev", ",".join(bdev_opts),
+                    "-device",   ",".join(dev_opts)])
+
   def _CdromOption(self, kvm_cmd, cdrom_disk_type, cdrom_image, cdrom_boot,
                    cdrom_id):
     """Extends L{kvm_cmd} with the '-blockdev/-device' options for a cdrom, and
@@ -1455,14 +1487,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
     floppy_image = hvp[constants.HV_KVM_FLOPPY_IMAGE_PATH]
     if floppy_image:
-      options = ",format=raw,media=disk"
-      if boot_floppy:
-        kvm_cmd.extend(["-boot", "a"])
-        options = "%s,boot=on" % options
-      if_val = ",if=floppy"
-      options = "%s%s" % (options, if_val)
-      drive_val = "file=%s%s" % (floppy_image, options)
-      kvm_cmd.extend(["-drive", drive_val])
+      self._FloppyOption(kvm_cmd, floppy_image, boot_floppy)
 
     if kernel_path:
       kvm_cmd.extend(["-kernel", kernel_path])
