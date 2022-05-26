@@ -43,7 +43,7 @@ from qa import qa_config
 from qa import qa_utils
 from qa import qa_error
 
-from qa_utils import AssertCommand, AssertIn, AssertNotIn
+from qa_utils import AssertIn, AssertNotIn
 
 
 _TEMP_OS_NAME = "TEMP-Ganeti-QA-OS"
@@ -56,12 +56,12 @@ _TEMP_OS_PATH = os.path.join(pathutils.OS_SEARCH_PATH[0], _TEMP_OS_NAME)
 
 def TestOsList():
   """gnt-os list"""
-  AssertCommand(["gnt-os", "list"])
+  qa_utils.AssertCommand(["gnt-os", "list"])
 
 
 def TestOsDiagnose():
   """gnt-os diagnose"""
-  AssertCommand(["gnt-os", "diagnose"])
+  qa_utils.AssertCommand(["gnt-os", "diagnose"])
 
 
 def _TestOsModify(hvp_dict, fail=False):
@@ -76,7 +76,7 @@ def _TestOsModify(hvp_dict, fail=False):
     cmd.append("%s:%s" % (hv_name, ",".join(options)))
 
   cmd.append(_TEMP_OS_NAME)
-  AssertCommand(cmd, fail=fail)
+  qa_utils.AssertCommand(cmd, fail=fail)
 
 
 def _TestOsStates(os_name):
@@ -86,9 +86,9 @@ def _TestOsStates(os_name):
   for param in ["hidden", "blacklisted"]:
     for val in ["yes", "no"]:
       new_cmd = cmd + ["--%s" % param, val, os_name]
-      AssertCommand(new_cmd)
+      qa_utils.AssertCommand(new_cmd)
       # check that double-running the command is OK
-      AssertCommand(new_cmd)
+      qa_utils.AssertCommand(new_cmd)
 
 
 def _SetupTempOs(node, dirname, variant, valid):
@@ -121,14 +121,14 @@ def _SetupTempOs(node, dirname, variant, valid):
                             (node.primary,
                              ["an invalid", "a valid"][int(valid)])))
 
-  AssertCommand(cmd, node=node)
+  qa_utils.AssertCommand(cmd, node=node)
 
 
 def _RemoveTempOs(node, dirname):
   """Removes a temporary OS definition.
 
   """
-  AssertCommand(["rm", "-rf", dirname], node=node)
+  qa_utils.AssertCommand(["rm", "-rf", dirname], node=node)
 
 
 def _TestOs(mode, rapi_cb):
@@ -144,7 +144,7 @@ def _TestOs(mode, rapi_cb):
 
   # Ensure OS is usable
   cmd = ["gnt-os", "modify", "--hidden=no", "--blacklisted=no", name]
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
 
   nodes = []
   try:
@@ -166,10 +166,10 @@ def _TestOs(mode, rapi_cb):
       # Change OS' visibility
       cmd = ["gnt-os", "modify", "--hidden", ["no", "yes"][int(hidden)],
              "--blacklisted", ["no", "yes"][int(blacklisted)], name]
-      AssertCommand(cmd)
+      qa_utils.AssertCommand(cmd)
 
       # Diagnose, checking exit status
-      AssertCommand(["gnt-os", "diagnose"], fail=(mode != _ALL_VALID))
+      qa_utils.AssertCommand(["gnt-os", "diagnose"], fail=(mode != _ALL_VALID))
 
       # Diagnose again, ignoring exit status
       output = qa_utils.GetCommandOutput(master.primary,
@@ -255,5 +255,5 @@ def TestOsModifyInvalid():
 
 def TestOsStatesNonExisting():
   """Testing OS states with non-existing OS"""
-  AssertCommand(["test", "-e", _TEMP_OS_PATH], fail=True)
+  qa_utils.AssertCommand(["test", "-e", _TEMP_OS_PATH], fail=True)
   return _TestOsStates(_TEMP_OS_NAME)

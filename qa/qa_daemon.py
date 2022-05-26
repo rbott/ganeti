@@ -41,7 +41,7 @@ from qa import qa_config
 from qa import qa_utils
 from qa import qa_error
 
-from qa_utils import AssertMatch, AssertCommand, StartSSH, GetCommandOutput
+from qa_utils import AssertMatch, StartSSH
 
 
 def _InstanceRunning(name):
@@ -64,7 +64,7 @@ def _ShutdownInstance(name):
   @param name: full name of the instance
 
   """
-  AssertCommand(["gnt-instance", "shutdown", "--no-remember", name])
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", "--no-remember", name])
 
   if _InstanceRunning(name):
     raise qa_error.Error("instance shutdown failed")
@@ -76,7 +76,7 @@ def _StartInstance(name):
   @param name: full name of the instance
 
   """
-  AssertCommand(["gnt-instance", "start", name])
+  qa_utils.AssertCommand(["gnt-instance", "start", name])
 
   if not bool(_InstanceRunning(name)):
     raise qa_error.Error("instance start failed")
@@ -90,14 +90,15 @@ def _ResetWatcherDaemon():
     qa_utils.MakeNodePath(qa_config.GetMasterNode(),
                           pathutils.WATCHER_GROUP_STATE_FILE % "*-*-*-*")
 
-  AssertCommand(["bash", "-c", "rm -vf %s" % path])
+  qa_utils.AssertCommand(["bash", "-c", "rm -vf %s" % path])
 
 
 def RunWatcherDaemon():
   """Runs the ganeti-watcher daemon on the master node.
 
   """
-  AssertCommand(["ganeti-watcher", "-d", "--ignore-pause", "--wait-children"])
+  qa_utils.AssertCommand(["ganeti-watcher", "-d", "--ignore-pause",
+                          "--wait-children"])
 
 
 def TestPauseWatcher():
@@ -106,11 +107,10 @@ def TestPauseWatcher():
   """
   master = qa_config.GetMasterNode()
 
-  AssertCommand(["gnt-cluster", "watcher", "pause", "4h"])
+  qa_utils.AssertCommand(["gnt-cluster", "watcher", "pause", "4h"])
 
   cmd = ["gnt-cluster", "watcher", "info"]
-  output = GetCommandOutput(master.primary,
-                            utils.ShellQuoteArgs(cmd))
+  output = qa_utils.GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
   AssertMatch(output, r"^.*\bis paused\b.*")
 
 
@@ -120,11 +120,10 @@ def TestResumeWatcher():
   """
   master = qa_config.GetMasterNode()
 
-  AssertCommand(["gnt-cluster", "watcher", "continue"])
+  qa_utils.AssertCommand(["gnt-cluster", "watcher", "continue"])
 
   cmd = ["gnt-cluster", "watcher", "info"]
-  output = GetCommandOutput(master.primary,
-                            utils.ShellQuoteArgs(cmd))
+  output = qa_utils.GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
   AssertMatch(output, r"^.*\bis not paused\b.*")
 
 
@@ -143,7 +142,7 @@ def TestInstanceAutomaticRestart(instance):
   if not _InstanceRunning(inst_name):
     raise qa_error.Error("Daemon didn't restart instance")
 
-  AssertCommand(["gnt-instance", "info", inst_name])
+  qa_utils.AssertCommand(["gnt-instance", "info", inst_name])
 
 
 def TestInstanceConsecutiveFailures(instance):
@@ -167,7 +166,7 @@ def TestInstanceConsecutiveFailures(instance):
         msg = "Instance started when it shouldn't"
       raise qa_error.Error(msg)
 
-  AssertCommand(["gnt-instance", "info", inst_name])
+  qa_utils.AssertCommand(["gnt-instance", "info", inst_name])
 
   if inst_was_running:
     _StartInstance(inst_name)

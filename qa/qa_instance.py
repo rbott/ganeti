@@ -49,7 +49,7 @@ from qa import qa_utils
 from qa import qa_error
 
 from qa_filters import stdout_of
-from qa_utils import AssertCommand, AssertEqual, AssertIn
+from qa_utils import AssertEqual, AssertIn
 from qa_utils import InstanceCheck, INST_DOWN, INST_UP, FIRST_ARG, RETURN_VALUE
 from qa_instance_utils import CheckSsconfInstanceList, \
                               CreateInstanceDrbd8, \
@@ -161,14 +161,14 @@ def _DestroyInstanceDisks(instance):
   if info["storage-type"] == constants.ST_LVM_VG:
     vols = info["volumes"]
     for node in info["nodes"]:
-      AssertCommand(["lvremove", "-f"] + vols, node=node)
+      qa_utils.AssertCommand(["lvremove", "-f"] + vols, node=node)
   elif info["storage-type"] in (constants.ST_FILE, constants.ST_SHARED_FILE):
     # Note that this works for both file and sharedfile, and this is intended.
     storage_dir = qa_config.get("file-storage-dir",
                                 pathutils.DEFAULT_FILE_STORAGE_DIR)
     idir = os.path.join(storage_dir, instance.name)
     for node in info["nodes"]:
-      AssertCommand(["rm", "-rf", idir], node=node)
+      qa_utils.AssertCommand(["rm", "-rf", idir], node=node)
   elif info["storage-type"] == constants.ST_DISKLESS:
     pass
 
@@ -357,19 +357,19 @@ def TestInstanceAddGluster(nodes):
 @InstanceCheck(None, INST_DOWN, FIRST_ARG)
 def TestInstanceRemove(instance):
   """gnt-instance remove"""
-  AssertCommand(["gnt-instance", "remove", "-f", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "remove", "-f", instance.name])
 
 
 @InstanceCheck(INST_DOWN, INST_UP, FIRST_ARG)
 def TestInstanceStartup(instance):
   """gnt-instance startup"""
-  AssertCommand(["gnt-instance", "startup", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "startup", instance.name])
 
 
 @InstanceCheck(INST_UP, INST_DOWN, FIRST_ARG)
 def TestInstanceShutdown(instance):
   """gnt-instance shutdown"""
-  AssertCommand(["gnt-instance", "shutdown", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", instance.name])
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -379,11 +379,12 @@ def TestInstanceReboot(instance):
   reboot_types = options.get("reboot-types", constants.REBOOT_TYPES)
   name = instance.name
   for rtype in reboot_types:
-    AssertCommand(["gnt-instance", "reboot", "--type=%s" % rtype, name])
+    qa_utils.AssertCommand(["gnt-instance", "reboot", "--type=%s" % rtype,
+                            name])
 
-  AssertCommand(["gnt-instance", "shutdown", name])
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", name])
   qa_utils.RunInstanceCheck(instance, False)
-  AssertCommand(["gnt-instance", "reboot", name])
+  qa_utils.AssertCommand(["gnt-instance", "reboot", name])
 
   master = qa_config.GetMasterNode()
   cmd = ["gnt-instance", "list", "--no-headers", "-o", "status", name]
@@ -407,7 +408,7 @@ def TestInstanceReinstall(instance):
   else:
     # Reinstall with OS image from QA storage
     url = "%s/busybox.img" % qa_storage
-    AssertCommand(["gnt-instance", "reinstall",
+    qa_utils.AssertCommand(["gnt-instance", "reinstall",
                    "--os-parameters", "os-image=" + url,
                    "-f", instance.name])
 
@@ -418,38 +419,36 @@ def TestInstanceReinstall(instance):
            " echo $(pwd)/busybox.img") % url
     image = qa_utils.GetCommandOutput(pnode, cmd).strip()
 
-    AssertCommand(["gnt-instance", "reinstall",
+    qa_utils.AssertCommand(["gnt-instance", "reinstall",
                    "--os-parameters", "os-image=" + image,
                    "-f", instance.name])
 
   # Reinstall non existing local file
-  AssertCommand(["gnt-instance", "reinstall",
+  qa_utils.AssertCommand(["gnt-instance", "reinstall",
                  "--os-parameters", "os-image=NonExistantOsForQa",
                  "-f", instance.name], fail=True)
 
   # Reinstall non existing URL
-  AssertCommand(["gnt-instance", "reinstall",
+  qa_utils.AssertCommand(["gnt-instance", "reinstall",
                  "--os-parameters", "os-image=http://NonExistantOsForQa",
                  "-f", instance.name], fail=True)
 
   # Reinstall using OS scripts
-  AssertCommand(["gnt-instance", "reinstall", "-f", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "reinstall", "-f", instance.name])
 
   # Test with non-existant OS definition
-  AssertCommand(["gnt-instance", "reinstall", "-f",
+  qa_utils.AssertCommand(["gnt-instance", "reinstall", "-f",
                  "--os-type=NonExistantOsForQa",
                  instance.name],
                 fail=True)
 
   # Test with existing OS but invalid variant
-  AssertCommand(["gnt-instance", "reinstall", "-f", "-o", "debootstrap+ola",
-                 instance.name],
-                fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "reinstall", "-f", "-o",
+                          "debootstrap+ola", instance.name], fail=True)
 
   # Test with existing OS but invalid variant
-  AssertCommand(["gnt-instance", "reinstall", "-f", "-o", "debian-image+ola",
-                 instance.name],
-                fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "reinstall", "-f", "-o",
+                          "debian-image+ola", instance.name], fail=True)
 
 
 @InstanceCheck(INST_DOWN, INST_DOWN, FIRST_ARG)
@@ -465,8 +464,8 @@ def TestInstanceRenameAndBack(rename_source, rename_target):
   # first do a rename to a different actual name, expecting it to fail
   qa_utils.AddToEtcHosts(["meeeeh-not-exists", rename_target])
   try:
-    AssertCommand(["gnt-instance", "rename", rename_source, rename_target],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-instance", "rename", rename_source,
+                            rename_target], fail=True)
     CheckSsconfInstanceList(rename_source)
   finally:
     qa_utils.RemoveFromEtcHosts(["meeeeh-not-exists", rename_target])
@@ -489,7 +488,8 @@ def TestInstanceRenameAndBack(rename_source, rename_target):
     tags_cmd = "false"
 
   # and now rename instance to rename_target...
-  AssertCommand(["gnt-instance", "rename", rename_source, rename_target])
+  qa_utils.AssertCommand(["gnt-instance", "rename", rename_source,
+                          rename_target])
   CheckSsconfInstanceList(rename_target)
   qa_utils.RunInstanceCheck(rename_source, False)
   qa_utils.RunInstanceCheck(rename_target, False)
@@ -499,19 +499,20 @@ def TestInstanceRenameAndBack(rename_source, rename_target):
   if (rename_source != rename_target and
       info["storage-type"] == constants.ST_LVM_VG):
     for node in info["nodes"]:
-      AssertCommand(tags_cmd + rename_source, node=node, fail=True)
-      AssertCommand(tags_cmd + rename_target, node=node, fail=False)
+      qa_utils.AssertCommand(tags_cmd + rename_source, node=node, fail=True)
+      qa_utils.AssertCommand(tags_cmd + rename_target, node=node, fail=False)
 
   # and back
-  AssertCommand(["gnt-instance", "rename", rename_target, rename_source])
+  qa_utils.AssertCommand(["gnt-instance", "rename", rename_target,
+                          rename_source])
   CheckSsconfInstanceList(rename_source)
   qa_utils.RunInstanceCheck(rename_target, False)
 
   if (rename_source != rename_target and
       info["storage-type"] == constants.ST_LVM_VG):
     for node in info["nodes"]:
-      AssertCommand(tags_cmd + rename_source, node=node, fail=False)
-      AssertCommand(tags_cmd + rename_target, node=node, fail=True)
+      qa_utils.AssertCommand(tags_cmd + rename_source, node=node, fail=False)
+      qa_utils.AssertCommand(tags_cmd + rename_target, node=node, fail=True)
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -525,11 +526,11 @@ def TestInstanceFailover(instance):
   cmd = ["gnt-instance", "failover", "--force", instance.name]
 
   # failover ...
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
   qa_utils.RunInstanceCheck(instance, True)
 
   # ... and back
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -546,55 +547,55 @@ def TestInstanceMigrate(instance, toggle_always_failover=True):
   af_init_val = _GetBoolInstanceField(instance.name, af_field)
 
   # migrate ...
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
   # TODO: Verify the choice between failover and migration
   qa_utils.RunInstanceCheck(instance, True)
 
   # ... and back (possibly with always_failover toggled)
   if toggle_always_failover:
-    AssertCommand(["gnt-instance", "modify", "-B",
-                   ("%s=%s" % (af_par, not af_init_val)),
-                   instance.name])
-  AssertCommand(cmd)
+    qa_utils.AssertCommand(["gnt-instance", "modify", "-B",
+                           ("%s=%s" % (af_par, not af_init_val)),
+                            instance.name])
+  qa_utils.AssertCommand(cmd)
   # TODO: Verify the choice between failover and migration
   qa_utils.RunInstanceCheck(instance, True)
   if toggle_always_failover:
-    AssertCommand(["gnt-instance", "modify", "-B",
-                   ("%s=%s" % (af_par, af_init_val)), instance.name])
+    qa_utils.AssertCommand(["gnt-instance", "modify", "-B",
+                           ("%s=%s" % (af_par, af_init_val)), instance.name])
 
   # TODO: Split into multiple tests
-  AssertCommand(["gnt-instance", "shutdown", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", instance.name])
   qa_utils.RunInstanceCheck(instance, False)
-  AssertCommand(cmd, fail=True)
-  AssertCommand(["gnt-instance", "migrate", "--force", "--allow-failover",
-                 instance.name])
-  AssertCommand(["gnt-instance", "start", instance.name])
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd, fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "migrate", "--force",
+                          "--allow-failover", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "start", instance.name])
+  qa_utils.AssertCommand(cmd)
   # @InstanceCheck enforces the check that the instance is running
   qa_utils.RunInstanceCheck(instance, True)
 
-  AssertCommand(["gnt-instance", "modify", "-B",
+  qa_utils.AssertCommand(["gnt-instance", "modify", "-B",
                  ("%s=%s" %
                   (constants.BE_ALWAYS_FAILOVER, constants.VALUE_TRUE)),
-                 instance.name])
+                  instance.name])
 
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
   qa_utils.RunInstanceCheck(instance, True)
   # TODO: Verify that a failover has been done instead of a migration
 
   # TODO: Verify whether the default value is restored here (not hardcoded)
-  AssertCommand(["gnt-instance", "modify", "-B",
-                 ("%s=%s" %
-                  (constants.BE_ALWAYS_FAILOVER, constants.VALUE_FALSE)),
-                 instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "-B",
+                         ("%s=%s" % (constants.BE_ALWAYS_FAILOVER,
+                                     constants.VALUE_FALSE)),
+                         instance.name])
 
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
   qa_utils.RunInstanceCheck(instance, True)
 
 
 def TestInstanceInfo(instance):
   """gnt-instance info"""
-  AssertCommand(["gnt-instance", "info", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "info", instance.name])
 
 
 def _TestKVMHotplug(instance, instance_info):
@@ -614,7 +615,8 @@ def _TestKVMHotplug(instance, instance_info):
 
   for alist in args_to_try:
     _, stdout, stderr = \
-      AssertCommand(["gnt-instance", "modify"] + alist + [instance.name])
+      qa_utils.AssertCommand(["gnt-instance", "modify"] + alist +
+                             [instance.name])
     if "failed" in stdout or "failed" in stderr:
       raise qa_error.Error("Hotplugging command failed; please check output"
                            " for further information")
@@ -690,18 +692,18 @@ def TestInstanceModify(instance):
       ])
 
   for alist in args:
-    AssertCommand(["gnt-instance", "modify"] + alist + [instance.name])
+    qa_utils.AssertCommand(["gnt-instance", "modify"] + alist + [instance.name])
 
   # check no-modify
-  AssertCommand(["gnt-instance", "modify", instance.name], fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "modify", instance.name], fail=True)
 
   # Marking offline while instance is running must fail...
-  AssertCommand(["gnt-instance", "modify", "--offline", instance.name],
-                 fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--offline", instance.name],
+                         fail=True)
 
   # ...while making it online fails too (needs to be offline first)
-  AssertCommand(["gnt-instance", "modify", "--online", instance.name],
-                 fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--online", instance.name],
+                         fail=True)
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -725,22 +727,26 @@ def TestInstanceModifyPrimaryAndBack(instance, currentnode, othernode):
                               pathutils.DEFAULT_FILE_STORAGE_DIR)
   disk = os.path.join(filestorage, name)
 
-  AssertCommand(["gnt-instance", "modify", "--new-primary=%s" % other, name],
-                fail=True)
-  AssertCommand(["gnt-instance", "shutdown", name])
-  AssertCommand(["scp", "-oGlobalKnownHostsFile=%s" %
-                 pathutils.SSH_KNOWN_HOSTS_FILE,
-                 "-oCheckHostIp=no", "-oStrictHostKeyChecking=yes",
-                 "-oHashKnownHosts=no", "-oHostKeyAlias=%s" % cluster_name,
-                 "-r", disk, "%s:%s" % (other, filestorage)], node=current)
-  AssertCommand(["gnt-instance", "modify", "--new-primary=%s" % other, name])
-  AssertCommand(["gnt-instance", "startup", name])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--new-primary=%s" % other,
+                          name], fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", name])
+  qa_utils.AssertCommand(["scp", "-oGlobalKnownHostsFile=%s" %
+                         pathutils.SSH_KNOWN_HOSTS_FILE,
+                         "-oCheckHostIp=no", "-oStrictHostKeyChecking=yes",
+                          "-oHashKnownHosts=no",
+                          "-oHostKeyAlias=%s" % cluster_name,
+                          "-r", disk, "%s:%s" % (other, filestorage)],
+                         node=current)
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--new-primary=%s" % other,
+                          name])
+  qa_utils.AssertCommand(["gnt-instance", "startup", name])
 
   # and back
-  AssertCommand(["gnt-instance", "shutdown", name])
-  AssertCommand(["rm", "-rf", disk], node=other)
-  AssertCommand(["gnt-instance", "modify", "--new-primary=%s" % current, name])
-  AssertCommand(["gnt-instance", "startup", name])
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", name])
+  qa_utils.AssertCommand(["rm", "-rf", disk], node=other)
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--new-primary=%s" %
+                          current, name])
+  qa_utils.AssertCommand(["gnt-instance", "startup", name])
 
 
 @InstanceCheck(INST_DOWN, INST_DOWN, FIRST_ARG)
@@ -749,23 +755,23 @@ def TestInstanceStoppedModify(instance):
   name = instance.name
 
   # Instance was not marked offline; try marking it online once more
-  AssertCommand(["gnt-instance", "modify", "--online", name])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--online", name])
 
   # Mark instance as offline
-  AssertCommand(["gnt-instance", "modify", "--offline", name])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--offline", name])
 
   # When the instance is offline shutdown should only work with --force,
   # while start should never work
-  AssertCommand(["gnt-instance", "shutdown", name], fail=True)
-  AssertCommand(["gnt-instance", "shutdown", "--force", name])
-  AssertCommand(["gnt-instance", "start", name], fail=True)
-  AssertCommand(["gnt-instance", "start", "--force", name], fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", name], fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", "--force", name])
+  qa_utils.AssertCommand(["gnt-instance", "start", name], fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "start", "--force", name], fail=True)
 
   # Also do offline to offline
-  AssertCommand(["gnt-instance", "modify", "--offline", name])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--offline", name])
 
   # And online again
-  AssertCommand(["gnt-instance", "modify", "--online", name])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "--online", name])
 
 
 @InstanceCheck(INST_DOWN, INST_DOWN, FIRST_ARG)
@@ -806,10 +812,10 @@ def TestInstanceConvertDiskTemplate(instance, requested_conversions):
         templ not in enabled_disk_templates or
         templ in constants.DTS_NOT_CONVERTIBLE_TO):
       continue
-    AssertCommand(_BuildConvertCommand(templ, snode))
+    qa_utils.AssertCommand(_BuildConvertCommand(templ, snode))
 
   # Before we return, convert to the original template
-  AssertCommand(_BuildConvertCommand(template, snode))
+  qa_utils.AssertCommand(_BuildConvertCommand(template, snode))
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -830,12 +836,13 @@ def TestInstanceModifyDisks(instance):
     # Any number is good for spindles in this case
     spindles = 1
     spindles_supported = False
-  AssertCommand(build_cmd("add:size=%s,spindles=%s" % (size, spindles)),
-                fail=not spindles_supported)
-  AssertCommand(build_cmd("add:size=%s" % size),
-                fail=spindles_supported)
+  qa_utils.AssertCommand(build_cmd("add:size=%s,spindles=%s" % (size,
+                                                                spindles)),
+                         fail=not spindles_supported)
+  qa_utils.AssertCommand(build_cmd("add:size=%s" % size),
+                         fail=spindles_supported)
   # Exactly one of the above commands has succeded, so we need one remove
-  AssertCommand(build_cmd("remove"))
+  qa_utils.AssertCommand(build_cmd("remove"))
 
 
 @InstanceCheck(INST_DOWN, INST_DOWN, FIRST_ARG)
@@ -857,15 +864,15 @@ def TestInstanceGrowDisk(instance):
 
   for idx, (size, grow) in enumerate(zip(all_size, all_grow)):
     # succeed in grow by amount
-    AssertCommand(["gnt-instance", "grow-disk", name, str(idx), grow])
+    qa_utils.AssertCommand(["gnt-instance", "grow-disk", name, str(idx), grow])
     # fail in grow to the old size
-    AssertCommand(["gnt-instance", "grow-disk", "--absolute", name, str(idx),
-                   size], fail=True)
+    qa_utils.AssertCommand(["gnt-instance", "grow-disk", "--absolute", name,
+                            str(idx), size], fail=True)
     # succeed to grow to old size + 2 * growth
     int_size = utils.ParseUnit(size)
     int_grow = utils.ParseUnit(grow)
-    AssertCommand(["gnt-instance", "grow-disk", "--absolute", name, str(idx),
-                   str(int_size + 2 * int_grow)])
+    qa_utils.AssertCommand(["gnt-instance", "grow-disk", "--absolute", name,
+                            str(idx), str(int_size + 2 * int_grow)])
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -883,20 +890,20 @@ def TestInstanceDeviceNames(instance):
     else:
       options = ""
     # succeed in adding a device named 'test_device'
-    AssertCommand(["gnt-instance", "modify",
+    qa_utils.AssertCommand(["gnt-instance", "modify",
                    "--%s=-1:add,name=test_device%s" % (dev_type, options),
                    name])
     # succeed in removing the 'test_device'
-    AssertCommand(["gnt-instance", "modify",
+    qa_utils.AssertCommand(["gnt-instance", "modify",
                    "--%s=test_device:remove" % dev_type,
                    name])
     # fail to add two devices with the same name
-    AssertCommand(["gnt-instance", "modify",
+    qa_utils.AssertCommand(["gnt-instance", "modify",
                    "--%s=-1:add,name=test_device%s" % (dev_type, options),
                    "--%s=-1:add,name=test_device%s" % (dev_type, options),
                    name], fail=True)
     # fail to add a device with invalid name
-    AssertCommand(["gnt-instance", "modify",
+    qa_utils.AssertCommand(["gnt-instance", "modify",
                    "--%s=-1:add,name=2%s" % (dev_type, options),
                    name], fail=True)
   # Rename disks
@@ -904,16 +911,16 @@ def TestInstanceDeviceNames(instance):
   disk_names = [d.get("name") for d in disks]
   for idx, disk_name in enumerate(disk_names):
     # Refer to disk by idx
-    AssertCommand(["gnt-instance", "modify",
+    qa_utils.AssertCommand(["gnt-instance", "modify",
                    "--disk=%s:modify,name=renamed" % idx,
                    name])
     # Refer to by name and rename to original name
-    AssertCommand(["gnt-instance", "modify",
+    qa_utils.AssertCommand(["gnt-instance", "modify",
                    "--disk=renamed:modify,name=%s" % disk_name,
                    name])
   if len(disks) >= 2:
     # fail in renaming to disks to the same name
-    AssertCommand(["gnt-instance", "modify",
+    qa_utils.AssertCommand(["gnt-instance", "modify",
                    "--disk=0:modify,name=same_name",
                    "--disk=1:modify,name=same_name",
                    name], fail=True)
@@ -932,7 +939,8 @@ def TestInstanceListFields():
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
 def TestInstanceConsole(instance):
   """gnt-instance console"""
-  AssertCommand(["gnt-instance", "console", "--show-cmd", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "console", "--show-cmd",
+                          instance.name])
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -970,16 +978,16 @@ def TestReplaceDisks(instance, curr_nodes, other_nodes):
         data = ["-I", constants.DEFAULT_IALLOCATOR_SHORTCUT]
       else:
         data = ["--new-secondary=%s" % othernode.primary]
-    AssertCommand(buildcmd(data))
+    qa_utils.AssertCommand(buildcmd(data))
 
-  AssertCommand(buildcmd(["-a"]))
-  AssertCommand(["gnt-instance", "stop", instance.name])
-  AssertCommand(buildcmd(["-a"]), fail=True)
-  AssertCommand(["gnt-instance", "activate-disks", instance.name])
-  AssertCommand(["gnt-instance", "activate-disks", "--wait-for-sync",
+  qa_utils.AssertCommand(buildcmd(["-a"]))
+  qa_utils.AssertCommand(["gnt-instance", "stop", instance.name])
+  qa_utils.AssertCommand(buildcmd(["-a"]), fail=True)
+  qa_utils.AssertCommand(["gnt-instance", "activate-disks", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "activate-disks", "--wait-for-sync",
                  instance.name])
-  AssertCommand(buildcmd(["-a"]))
-  AssertCommand(["gnt-instance", "start", instance.name])
+  qa_utils.AssertCommand(buildcmd(["-a"]))
+  qa_utils.AssertCommand(["gnt-instance", "start", instance.name])
 
 
 def _AssertRecreateDisks(cmdargs, instance, fail=False, check=True,
@@ -995,14 +1003,14 @@ def _AssertRecreateDisks(cmdargs, instance, fail=False, check=True,
   """
   if destroy:
     _DestroyInstanceDisks(instance)
-  AssertCommand((["gnt-instance", "recreate-disks"] + cmdargs +
+  qa_utils.AssertCommand((["gnt-instance", "recreate-disks"] + cmdargs +
                  [instance.name]), fail)
   if not fail and check:
     # Quick check that the disks are there
-    AssertCommand(["gnt-instance", "activate-disks", instance.name])
-    AssertCommand(["gnt-instance", "activate-disks", "--wait-for-sync",
+    qa_utils.AssertCommand(["gnt-instance", "activate-disks", instance.name])
+    qa_utils.AssertCommand(["gnt-instance", "activate-disks", "--wait-for-sync",
                    instance.name])
-    AssertCommand(["gnt-instance", "deactivate-disks", instance.name])
+    qa_utils.AssertCommand(["gnt-instance", "deactivate-disks", instance.name])
 
 
 def _BuildRecreateDisksOpts(en_disks, with_spindles, with_growth,
@@ -1051,7 +1059,7 @@ def TestRecreateDisks(instance, inodes, othernodes):
     _AssertRecreateDisks(["-I", "hail"], instance, fail=True, destroy=False)
   else:
     _AssertRecreateDisks(["-n", other_seq], instance, fail=True, destroy=False)
-  AssertCommand(["gnt-instance", "stop", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "stop", instance.name])
   # Disks exist: this should fail
   _AssertRecreateDisks([], instance, fail=True, destroy=False)
   # Unsupported spindles parameters: fail
@@ -1097,8 +1105,8 @@ def TestRecreateDisks(instance, inodes, othernodes):
     _AssertRecreateDisks(disk_opts, instance, destroy=False, check=False,
                          fail=spindles_supported)
   # This and InstanceCheck decoration check that the disks are working
-  AssertCommand(["gnt-instance", "reinstall", "-f", instance.name])
-  AssertCommand(["gnt-instance", "start", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "reinstall", "-f", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "start", instance.name])
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -1111,21 +1119,21 @@ def TestInstanceExport(instance, node):
   if instance.disk_template in [constants.DT_FILE, constants.DT_SHARED_FILE]:
     options.append("--long-sleep")
 
-  AssertCommand(options + [name])
+  qa_utils.AssertCommand(options + [name])
   return qa_utils.ResolveInstanceName(name)
 
 
 @InstanceCheck(None, INST_DOWN, FIRST_ARG)
 def TestInstanceExportWithRemove(instance, node):
   """gnt-backup export --remove-instance"""
-  AssertCommand(["gnt-backup", "export", "-n", node.primary,
+  qa_utils.AssertCommand(["gnt-backup", "export", "-n", node.primary,
                  "--remove-instance", instance.name])
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
 def TestInstanceExportNoTarget(instance):
   """gnt-backup export (without target node, should fail)"""
-  AssertCommand(["gnt-backup", "export", instance.name], fail=True)
+  qa_utils.AssertCommand(["gnt-backup", "export", instance.name], fail=True)
 
 
 @InstanceCheck(None, INST_DOWN, FIRST_ARG)
@@ -1143,13 +1151,13 @@ def TestInstanceImport(newinst, node, expnode, name):
          GetGenericAddParameters(newinst, templ,
                                   force_mac=constants.VALUE_GENERATE))
   cmd.append(newinst.name)
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
   newinst.SetDiskTemplate(templ)
 
 
 def TestBackupList(expnode):
   """gnt-backup list"""
-  AssertCommand(["gnt-backup", "list", "--node=%s" % expnode.primary])
+  qa_utils.AssertCommand(["gnt-backup", "list", "--node=%s" % expnode.primary])
 
   qa_utils.GenericQueryTest("gnt-backup", list(query.EXPORT_FIELDS),
                             namefield=None, test_unknown=False)
@@ -1191,13 +1199,13 @@ def TestRemoveInstanceOfflineNode(instance, snode, set_offline, set_online):
           "(drbdsetup %d down >/dev/null 2>&1;" \
           " drbdsetup down resource%d >/dev/null 2>&1) || /bin/true" % \
             (minor, minor)
-        AssertCommand(drbd_shutdown_cmd, node=snode)
-      AssertCommand(["lvremove", "-f"] + info["volumes"], node=snode)
+        qa_utils.AssertCommand(drbd_shutdown_cmd, node=snode)
+      qa_utils.AssertCommand(["lvremove", "-f"] + info["volumes"], node=snode)
     elif info["storage-type"] == constants.ST_FILE:
       filestorage = qa_config.get("file-storage-dir",
                                   pathutils.DEFAULT_FILE_STORAGE_DIR)
       disk = os.path.join(filestorage, instance.name)
-      AssertCommand(["rm", "-rf", disk], node=snode)
+      qa_utils.AssertCommand(["rm", "-rf", disk], node=snode)
 
 
 def TestInstanceCreationRestrictedByDiskTemplates():
@@ -1210,7 +1218,7 @@ def TestInstanceCreationRestrictedByDiskTemplates():
   nodes = qa_config.AcquireManyNodes(2)
 
   # Setup the cluster with the enabled_disk_templates
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % ",".join(enabled_disk_templates),
      "--ipolicy-disk-templates=%s" % ",".join(enabled_disk_templates)],
@@ -1238,10 +1246,10 @@ def TestInstanceCreationRestrictedByDiskTemplates():
 
     for (enabled, disabled) in [(templates1, templates2),
                                 (templates2, templates1)]:
-      AssertCommand(["gnt-cluster", "modify",
-                     "--enabled-disk-templates=%s" % ",".join(enabled),
-                     "--ipolicy-disk-templates=%s" % ",".join(enabled)],
-                    fail=False)
+      qa_utils.AssertCommand(["gnt-cluster", "modify",
+                             "--enabled-disk-templates=%s" % ",".join(enabled),
+                             "--ipolicy-disk-templates=%s" % ",".join(enabled)],
+                             fail=False)
       for disk_template in disabled:
         CreateInstanceByDiskTemplate(nodes, disk_template, fail=True)
   elif (len(enabled_disk_templates) == 1):
@@ -1251,24 +1259,24 @@ def TestInstanceCreationRestrictedByDiskTemplates():
     other_disk_templates = list(
                              set([constants.DT_DISKLESS, constants.DT_BLOCK]) -
                              set(enabled_disk_templates))
-    AssertCommand(["gnt-cluster", "modify",
-                   "--enabled-disk-templates=%s" %
-                     ",".join(other_disk_templates),
-                   "--ipolicy-disk-templates=%s" %
-                     ",".join(other_disk_templates)],
-                  fail=False)
+    qa_utils.AssertCommand(["gnt-cluster", "modify",
+                            "--enabled-disk-templates=%s" %
+                            ",".join(other_disk_templates),
+                            "--ipolicy-disk-templates=%s" %
+                            ",".join(other_disk_templates)],
+                           fail=False)
     CreateInstanceByDiskTemplate(nodes, enabled_disk_templates[0], fail=True)
   else:
     raise qa_error.Error("Please enable at least one disk template"
                          " in your QA setup.")
 
   # Restore initially enabled disk templates
-  AssertCommand(["gnt-cluster", "modify",
-                 "--enabled-disk-templates=%s" %
-                   ",".join(enabled_disk_templates),
-                 "--ipolicy-disk-templates=%s" %
-                   ",".join(enabled_disk_templates)],
-                 fail=False)
+  qa_utils.AssertCommand(["gnt-cluster", "modify",
+                          "--enabled-disk-templates=%s" %
+                          ",".join(enabled_disk_templates),
+                          "--ipolicy-disk-templates=%s" %
+                          ",".join(enabled_disk_templates)],
+                         fail=False)
 
 
 def _AssertInstance(instance, status, admin_state, admin_state_source):
@@ -1294,7 +1302,7 @@ def _TestInstanceUserDown(instance, hv_shutdown_fn):
                   constants.ADMINST_UP,
                   constants.ADMIN_SOURCE)
 
-  AssertCommand(["gnt-instance", "start", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "start", instance.name])
 
   _AssertInstance(instance,
                   constants.INSTST_RUNNING,
@@ -1318,7 +1326,7 @@ def _TestInstanceUserDown(instance, hv_shutdown_fn):
                   constants.ADMINST_DOWN,
                   constants.USER_SOURCE)
 
-  AssertCommand(["gnt-instance", "start", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "start", instance.name])
 
   _AssertInstance(instance,
                   constants.INSTST_RUNNING,
@@ -1343,14 +1351,14 @@ def _TestInstanceUserDown(instance, hv_shutdown_fn):
                   constants.ADMINST_DOWN,
                   constants.USER_SOURCE)
 
-  AssertCommand(["gnt-instance", "shutdown", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", instance.name])
 
   _AssertInstance(instance,
                   constants.INSTST_ADMINDOWN,
                   constants.ADMINST_DOWN,
                   constants.ADMIN_SOURCE)
 
-  AssertCommand(["gnt-instance", "start", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "start", instance.name])
 
   _AssertInstance(instance,
                   constants.INSTST_RUNNING,
@@ -1367,14 +1375,14 @@ def _TestInstanceUserDown(instance, hv_shutdown_fn):
                   constants.ADMINST_UP,
                   constants.ADMIN_SOURCE)
 
-  AssertCommand(["gnt-instance", "shutdown", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "shutdown", instance.name])
 
   _AssertInstance(instance,
                   constants.INSTST_ADMINDOWN,
                   constants.ADMINST_DOWN,
                   constants.ADMIN_SOURCE)
 
-  AssertCommand(["gnt-instance", "start", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "start", instance.name])
 
   _AssertInstance(instance,
                   constants.INSTST_RUNNING,
@@ -1385,36 +1393,36 @@ def _TestInstanceUserDown(instance, hv_shutdown_fn):
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
 def _TestInstanceUserDownXen(instance):
   primary = _GetInstanceField(instance.name, "pnode")
-  fn = lambda: AssertCommand(["xl", "shutdown", "-w", instance.name],
+  fn = lambda: qa_utils.AssertCommand(["xl", "shutdown", "-w", instance.name],
                              node=primary)
 
-  AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
   _TestInstanceUserDown(instance, fn)
-  AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
 def _TestInstanceUserDownKvm(instance):
   def _StopKVMInstance():
-    AssertCommand("pkill -f \"\\-name %s\"" % instance.name, node=primary)
+    qa_utils.AssertCommand("pkill -f \"\\-name %s\"" % instance.name, node=primary)
     time.sleep(10)
 
-  AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
-  AssertCommand(["gnt-instance", "modify", "-H", "user_shutdown=true",
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "-H", "user_shutdown=true",
                  instance.name])
 
   # The instance needs to reboot not because the 'user_shutdown'
   # parameter was modified but because the KVM daemon need to be
   # started, given that the instance was first created with user
   # shutdown disabled.
-  AssertCommand(["gnt-instance", "reboot", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "reboot", instance.name])
 
   primary = _GetInstanceField(instance.name, "pnode")
   _TestInstanceUserDown(instance, _StopKVMInstance)
 
-  AssertCommand(["gnt-instance", "modify", "-H", "user_shutdown=false",
+  qa_utils.AssertCommand(["gnt-instance", "modify", "-H", "user_shutdown=false",
                  instance.name])
-  AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
 
 
 def TestInstanceUserDown(instance):
@@ -1429,8 +1437,8 @@ def TestInstanceUserDown(instance):
       fn(instance)
       qa_daemon.TestResumeWatcher()
     else:
-      print("%s hypervisor is not enabled, skipping test for this hypervisor" \
-          % hv)
+      print("%s hypervisor is not enabled, skipping test for this hypervisor" %
+            hv)
 
 
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
@@ -1447,10 +1455,10 @@ def TestInstanceCommunication(instance, master):
   print(result_output)
 
   # Enable instance communication mechanism for this instance
-  AssertCommand(["gnt-instance", "modify", "-c", "yes", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "-c", "yes", instance.name])
 
   # Reboot instance for changes to NIC to take effect
-  AssertCommand(["gnt-instance", "reboot", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "reboot", instance.name])
 
   # Check if the instance is properly configured for instance
   # communication.
@@ -1527,10 +1535,10 @@ def TestInstanceCommunication(instance, master):
               msg="Checking if the TAP interface has the expected netmask")
 
   # Disable instance communication mechanism for this instance
-  AssertCommand(["gnt-instance", "modify", "-c", "no", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "modify", "-c", "no", instance.name])
 
   # Reboot instance for changes to NIC to take effect
-  AssertCommand(["gnt-instance", "reboot", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "reboot", instance.name])
 
   # Disable instance communication network at cluster level
   cmd = ["gnt-cluster", "modify",
@@ -1544,7 +1552,7 @@ def _TestRedactionOfSecretOsParams(node, cmd, secret_keys):
   """Tests redaction of secret os parameters
 
   """
-  AssertCommand(["gnt-cluster", "modify", "--max-running-jobs", "1"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--max-running-jobs", "1"])
   debug_delay_id = int(stdout_of(["gnt-debug", "delay", "--print-jobid",
                        "--submit", "300"]))
   cmd_jid = int(stdout_of(cmd))
@@ -1553,12 +1561,12 @@ def _TestRedactionOfSecretOsParams(node, cmd, secret_keys):
 
   for k in secret_keys:
     grep_cmd = ["grep", "\"%s\":\"<redacted>\"" % k, job_file]
-    AssertCommand(grep_cmd)
+    qa_utils.AssertCommand(grep_cmd)
 
-  AssertCommand(["gnt-job", "cancel", "--kill", "--yes-do-it",
+  qa_utils.AssertCommand(["gnt-job", "cancel", "--kill", "--yes-do-it",
                 str(debug_delay_id)])
-  AssertCommand(["gnt-cluster", "modify", "--max-running-jobs", "20"])
-  AssertCommand(["gnt-job", "wait", str(cmd_jid)])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--max-running-jobs", "20"])
+  qa_utils.AssertCommand(["gnt-job", "wait", str(cmd_jid)])
 
 
 def TestInstanceAddOsParams():

@@ -35,7 +35,7 @@ conditions.
 
 import uuid
 
-from qa_utils import AssertCommand
+from qa import qa_utils
 
 # String used as a comment for produced `iptables` results
 IPTABLES_COMMENT_MARKER = "ganeti_qa_script"
@@ -76,7 +76,7 @@ class Rules(object):
   def AppendRule(self, node, chain, rule, table="filter"):
     """Appends an `iptables` rule to a given node
     """
-    AssertCommand(["iptables", "-t", table, "-A", chain] +
+    qa_utils.AssertCommand(["iptables", "-t", table, "-A", chain] +
                   rule +
                   ["-m", "comment",
                    "--comment", self.marker],
@@ -108,6 +108,5 @@ def CleanRules(nodes, marker=IPTABLES_COMMENT_MARKER):
   if not hasattr(nodes, '__iter__'):
     nodes = [nodes]
   for node in nodes:
-    AssertCommand(("iptables-save | grep -v '%s' | iptables-restore" %
-                    (marker, )),
-                  node=node)
+    qa_utils.AssertCommand(("iptables-save | grep -v '%s' | iptables-restore" %
+                            (marker, )), node=node)

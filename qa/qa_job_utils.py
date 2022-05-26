@@ -45,8 +45,9 @@ from ganeti.utils import retry
 from qa import qa_config
 from qa import qa_logging
 from qa import qa_error
+from qa import qa_utils
 
-from qa_utils import AssertCommand, GetCommandOutput, GetObjectInfo, stdout_of
+from qa_utils import GetCommandOutput, GetObjectInfo, stdout_of
 
 
 AVAILABLE_LOCKS = [locking.LEVEL_NODE, ]
@@ -168,7 +169,8 @@ def _TerminateDelayFunction(termination_socket):
   """ Terminates the delay function by communicating with the domain socket.
 
   """
-  AssertCommand("echo a | socat -u stdin UNIX-CLIENT:%s" % termination_socket)
+  qa_utils.AssertCommand("echo a | socat -u stdin UNIX-CLIENT:%s" %
+                         termination_socket)
 
 
 def _GetNodeUUIDMap(nodes):
@@ -319,11 +321,11 @@ class PausedWatcher(object):
 
   """
   def __enter__(self):
-    AssertCommand(["gnt-cluster", "watcher", "pause", "12h"])
+    qa_utils.AssertCommand(["gnt-cluster", "watcher", "pause", "12h"])
 
   def __exit__(self, _ex_type, ex_value, _ex_traceback):
     try:
-      AssertCommand(["gnt-cluster", "watcher", "continue"])
+      qa_utils.AssertCommand(["gnt-cluster", "watcher", "continue"])
     except qa_error.Error as err:
       # If an exception happens during 'continue', re-raise it only if there
       # is no exception from the inner block:
@@ -368,7 +370,7 @@ def RunWithLocks(fn, locks, timeout, block, *args, **kwargs):
 
   # The watcher may interfere by issuing its own jobs - therefore pause it
   # also reject all its jobs and wait for any running jobs to finish.
-  AssertCommand(["gnt-cluster", "watcher", "pause", "12h"])
+  qa_utils.AssertCommand(["gnt-cluster", "watcher", "pause", "12h"])
   filter_uuid = stdout_of([
     "gnt-filter", "add",
     '--predicates=[["reason", ["=", "source", "gnt:watcher"]]]',
@@ -426,8 +428,8 @@ def RunWithLocks(fn, locks, timeout, block, *args, **kwargs):
     pass
 
   # Revive the watcher
-  AssertCommand(["gnt-filter", "delete", filter_uuid])
-  AssertCommand(["gnt-cluster", "watcher", "continue"])
+  qa_utils.AssertCommand(["gnt-filter", "delete", filter_uuid])
+  qa_utils.AssertCommand(["gnt-cluster", "watcher", "continue"])
 
 
 def GetJobStatus(job_id):

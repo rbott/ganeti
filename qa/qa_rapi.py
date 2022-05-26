@@ -67,8 +67,7 @@ from qa_instance import IsDiskReplacingSupported
 from qa_instance import IsFailoverSupported
 from qa_instance import IsMigrationSupported
 from qa_job_utils import RunWithLocks
-from qa_utils import (AssertEqual, AssertIn, AssertMatch, AssertCommand,
-                      StartLocalCommand)
+from qa_utils import (AssertEqual, AssertIn, AssertMatch, StartLocalCommand)
 from qa_utils import InstanceCheck, INST_DOWN, INST_UP, FIRST_ARG
 
 
@@ -99,16 +98,16 @@ def _EnsureRapiFilesPresence():
                                  % rapi_files_location))
 
   # The RAPI files
-  AssertCommand(["mkdir", "-p", pathutils.RAPI_DATA_DIR])
+  qa_utils.AssertCommand(["mkdir", "-p", pathutils.RAPI_DATA_DIR])
 
   for filename in _FILES_TO_COPY:
     basename = os.path.split(filename)[-1]
-    AssertCommand(["cp", os.path.join(rapi_files_location, basename),
+    qa_utils.AssertCommand(["cp", os.path.join(rapi_files_location, basename),
                    filename])
-    AssertCommand(["gnt-cluster", "copyfile", filename])
+    qa_utils.AssertCommand(["gnt-cluster", "copyfile", filename])
 
   # The certificates have to be reloaded now
-  AssertCommand(["service", "ganeti", "restart"])
+  qa_utils.AssertCommand(["service", "ganeti", "restart"])
 
 
 def ReloadCertificates(ensure_presence=True):
@@ -188,15 +187,15 @@ def _CreateRapiUser(rapi_user):
 
     tmpru = qa_utils.UploadFile(master.primary, fh.name)
     try:
-      AssertCommand(["mkdir", "-p", rapi_dir])
-      AssertCommand(["mv", tmpru, rapi_users_path])
+      qa_utils.AssertCommand(["mkdir", "-p", rapi_dir])
+      qa_utils.AssertCommand(["mv", tmpru, rapi_users_path])
     finally:
-      AssertCommand(["rm", "-f", tmpru])
+      qa_utils.AssertCommand(["rm", "-f", tmpru])
   finally:
     fh.close()
 
   # The certificates have to be reloaded now
-  AssertCommand(["service", "ganeti", "restart"])
+  qa_utils.AssertCommand(["service", "ganeti", "restart"])
 
   return rapi_secret
 

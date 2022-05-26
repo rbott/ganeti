@@ -36,8 +36,8 @@ from ganeti import _constants
 from ganeti import constants
 
 from qa import qa_config
+from qa import qa_utils
 
-from qa_utils import AssertCommand
 from qa_instance_utils import CreateInstanceByDiskTemplate, \
                               RemoveInstance
 
@@ -56,7 +56,7 @@ def TestInstStatusCollector():
     return
 
   # Execute on master on an empty cluster
-  AssertCommand([MON_COLLECTOR, "inst-status-xen"])
+  qa_utils.AssertCommand([MON_COLLECTOR, "inst-status-xen"])
 
   #Execute on cluster with instances
   node1 = qa_config.AcquireNode()
@@ -64,8 +64,8 @@ def TestInstStatusCollector():
   template = qa_config.GetDefaultDiskTemplate()
 
   instance = CreateInstanceByDiskTemplate([node1, node2], template)
-  AssertCommand([MON_COLLECTOR, "inst-status-xen"], node=node1)
-  AssertCommand([MON_COLLECTOR, "inst-status-xen"], node=node2)
+  qa_utils.AssertCommand([MON_COLLECTOR, "inst-status-xen"], node=node1)
+  qa_utils.AssertCommand([MON_COLLECTOR, "inst-status-xen"], node=node2)
   RemoveInstance(instance)
 
   node1.Release()

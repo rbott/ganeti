@@ -42,11 +42,9 @@ from qa import qa_config
 from qa import qa_error
 from qa import qa_utils
 
-from qa_utils import AssertIn, AssertCommand
-
 
 def RemoveInstance(instance):
-  AssertCommand(["gnt-instance", "remove", "-f", instance.name])
+  qa_utils.AssertCommand(["gnt-instance", "remove", "-f", instance.name])
 
 
 def GetGenericAddParameters(inst, disk_template, force_mac=None):
@@ -105,7 +103,7 @@ def _CreateInstanceByDiskTemplateRaw(nodes_spec, disk_template, fail=False):
            GetGenericAddParameters(instance, disk_template))
     cmd.append(instance.name)
 
-    AssertCommand(cmd, fail=fail)
+    qa_utils.AssertCommand(cmd, fail=fail)
 
     if not fail:
       CheckSsconfInstanceList(instance.name)

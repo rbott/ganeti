@@ -41,8 +41,7 @@ from qa import qa_config
 from qa import qa_error
 from qa import qa_utils
 
-from qa_utils import AssertCommand, AssertRedirectedCommand, AssertEqual, \
-  AssertIn, GetCommandOutput
+from qa_utils import AssertRedirectedCommand, AssertEqual, AssertIn
 
 
 def NodeAdd(node, readd=False, group=None):
@@ -64,7 +63,7 @@ def NodeAdd(node, readd=False, group=None):
 
   cmd.append(node.primary)
 
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
 
   if readd:
     AssertRedirectedCommand(["gnt-cluster", "verify"])
@@ -76,14 +75,15 @@ def NodeAdd(node, readd=False, group=None):
 
 
 def NodeRemove(node):
-  AssertCommand(["gnt-node", "remove", node.primary])
+  qa_utils.AssertCommand(["gnt-node", "remove", node.primary])
   node.MarkRemoved()
 
 
 def MakeNodeOffline(node, value):
   """gnt-node modify --offline=value"""
   # value in ["yes", "no"]
-  AssertCommand(["gnt-node", "modify", "--offline", value, node.primary])
+  qa_utils.AssertCommand(["gnt-node", "modify", "--offline", value,
+                          node.primary])
 
 
 def TestNodeAddAll():
@@ -121,12 +121,12 @@ def TestNodeReadd(node):
 
 def TestNodeInfo():
   """gnt-node info"""
-  AssertCommand(["gnt-node", "info"])
+  qa_utils.AssertCommand(["gnt-node", "info"])
 
 
 def TestNodeVolumes():
   """gnt-node volumes"""
-  AssertCommand(["gnt-node", "volumes"])
+  qa_utils.AssertCommand(["gnt-node", "volumes"])
 
 
 def TestNodeStorage():
@@ -144,12 +144,12 @@ def TestNodeStorage():
     cmd = ["gnt-node", "list-storage", "--storage-type", storage_type]
 
     # Test simple list
-    AssertCommand(cmd)
+    qa_utils.AssertCommand(cmd)
 
     # Test all storage fields
     cmd = ["gnt-node", "list-storage", "--storage-type", storage_type,
            "--output=%s" % ",".join(list(constants.VALID_STORAGE_FIELDS))]
-    AssertCommand(cmd)
+    qa_utils.AssertCommand(cmd)
 
     # Get list of valid storage devices
     cmd = ["gnt-node", "list-storage", "--storage-type", storage_type,
@@ -166,7 +166,7 @@ def TestNodeStorage():
 
       # Dummy modification without any changes
       cmd = ["gnt-node", "modify-storage", node_name, storage_type, st_name]
-      AssertCommand(cmd)
+      qa_utils.AssertCommand(cmd)
 
       # Make sure we end up with the same value as before
       if st_allocatable.lower() == "y":
@@ -178,8 +178,8 @@ def TestNodeStorage():
               constants.MODIFIABLE_STORAGE_FIELDS.get(storage_type, []))
 
       for i in test_allocatable:
-        AssertCommand(["gnt-node", "modify-storage", "--allocatable", i,
-                       node_name, storage_type, st_name], fail=fail)
+        qa_utils.AssertCommand(["gnt-node", "modify-storage", "--allocatable",
+                                i, node_name, storage_type, st_name], fail=fail)
 
         # Verify list output
         cmd = ["gnt-node", "list-storage", "--storage-type", storage_type,
@@ -197,8 +197,8 @@ def TestNodeStorage():
       # Test repair functionality
       fail = (constants.SO_FIX_CONSISTENCY not in
               constants.VALID_STORAGE_OPERATIONS.get(storage_type, []))
-      AssertCommand(["gnt-node", "repair-storage", node_name,
-                     storage_type, st_name], fail=fail)
+      qa_utils.AssertCommand(["gnt-node", "repair-storage", node_name,
+                              storage_type, st_name], fail=fail)
 
 
 def TestNodeFailover(node, node2):
@@ -209,10 +209,10 @@ def TestNodeFailover(node, node2):
                                      " it to have no primary instances.")
 
   # Fail over to secondary node
-  AssertCommand(["gnt-node", "failover", "-f", node.primary])
+  qa_utils.AssertCommand(["gnt-node", "failover", "-f", node.primary])
 
   # ... and back again.
-  AssertCommand(["gnt-node", "failover", "-f", node2.primary])
+  qa_utils.AssertCommand(["gnt-node", "failover", "-f", node2.primary])
 
 
 def TestNodeMigrate(node, node2):
@@ -223,10 +223,10 @@ def TestNodeMigrate(node, node2):
                                      " it to have no primary instances.")
 
   # Migrate to secondary node
-  AssertCommand(["gnt-node", "migrate", "-f", node.primary])
+  qa_utils.AssertCommand(["gnt-node", "migrate", "-f", node.primary])
 
   # ... and back again.
-  AssertCommand(["gnt-node", "migrate", "-f", node2.primary])
+  qa_utils.AssertCommand(["gnt-node", "migrate", "-f", node2.primary])
 
 
 def TestNodeEvacuate(node, node2):
@@ -239,12 +239,14 @@ def TestNodeEvacuate(node, node2):
                                        " it to have no secondary instances.")
 
     # Evacuate all secondary instances
-    AssertCommand(["gnt-node", "evacuate", "-f",
-                   "--new-secondary=%s" % node3.primary, node2.primary])
+    qa_utils.AssertCommand(["gnt-node", "evacuate", "-f",
+                            "--new-secondary=%s" % node3.primary,
+                            node2.primary])
 
     # ... and back again.
-    AssertCommand(["gnt-node", "evacuate", "-f",
-                   "--new-secondary=%s" % node2.primary, node3.primary])
+    qa_utils.AssertCommand(["gnt-node", "evacuate", "-f",
+                            "--new-secondary=%s" % node2.primary,
+                            node3.primary])
   finally:
     node3.Release()
 
@@ -259,30 +261,31 @@ def TestNodeModify(node):
   # Reduce the number of master candidates, because otherwise all
   # subsequent 'gnt-cluster verify' commands fail due to not enough
   # master candidates.
-  AssertCommand(["gnt-cluster", "modify",
+  qa_utils.AssertCommand(["gnt-cluster", "modify",
                  "--candidate-pool-size=%s" % test_pool_size])
 
   # make sure enough master candidates will be available by disabling the
   # master candidate role first with --auto-promote
-  AssertCommand(["gnt-node", "modify", "--master-candidate=no",
+  qa_utils.AssertCommand(["gnt-node", "modify", "--master-candidate=no",
                 "--auto-promote", node.primary])
 
   # now it's save to force-remove the master candidate role
   for flag in ["master-candidate", "drained", "offline"]:
     for value in ["yes", "no"]:
-      AssertCommand(["gnt-node", "modify", "--force",
+      qa_utils.AssertCommand(["gnt-node", "modify", "--force",
                      "--%s=%s" % (flag, value), node.primary])
-      AssertCommand(["gnt-cluster", "verify"])
+      qa_utils.AssertCommand(["gnt-cluster", "verify"])
 
-  AssertCommand(["gnt-node", "modify", "--master-candidate=yes", node.primary])
+  qa_utils.AssertCommand(["gnt-node", "modify", "--master-candidate=yes",
+                          node.primary])
 
   # Test setting secondary IP address
-  AssertCommand(["gnt-node", "modify", "--secondary-ip=%s" % node.secondary,
-                 node.primary])
+  qa_utils.AssertCommand(["gnt-node", "modify", "--secondary-ip=%s" %
+                          node.secondary, node.primary])
 
   AssertRedirectedCommand(["gnt-cluster", "verify"])
-  AssertCommand(["gnt-cluster", "modify",
-                 "--candidate-pool-size=%s" % default_pool_size])
+  qa_utils.AssertCommand(["gnt-cluster", "modify",
+                          "--candidate-pool-size=%s" % default_pool_size])
 
   # For test clusters with more nodes than the default pool size,
   # we now have too many master candidates. To readjust to the original
@@ -291,8 +294,8 @@ def TestNodeModify(node):
     master = qa_config.GetMasterNode()
     for n in nodes:
       if n.primary != master.primary:
-        AssertCommand(["gnt-node", "modify", "--master-candidate=no",
-                       "--auto-promote", n.primary])
+        qa_utils.AssertCommand(["gnt-node", "modify", "--master-candidate=no",
+                                "--auto-promote", n.primary])
 
 
 def _CreateOobScriptStructure():
@@ -345,122 +348,127 @@ def TestOutOfBand():
    data_path, exit_code_path) = _CreateOobScriptStructure()
 
   try:
-    AssertCommand(["gnt-cluster", "modify", "--node-parameters",
-                   "oob_program=%s" % oob_path])
+    qa_utils.AssertCommand(["gnt-cluster", "modify", "--node-parameters",
+                            "oob_program=%s" % oob_path])
 
     # No data, exit 0
     _UpdateOobFile(exit_code_path, "0")
 
-    AssertCommand(["gnt-node", "power", "on", node_name])
+    qa_utils.AssertCommand(["gnt-node", "power", "on", node_name])
     _AssertOobCall(verify_path, "power-on %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "power", "-f", "off", node_name])
+    qa_utils.AssertCommand(["gnt-node", "power", "-f", "off", node_name])
     _AssertOobCall(verify_path, "power-off %s" % full_node_name)
 
     # Power off on master without options should fail
-    AssertCommand(["gnt-node", "power", "-f", "off", master_name], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "-f", "off", master_name],
+                           fail=True)
     # With force master it should still fail
-    AssertCommand(["gnt-node", "power", "-f", "--ignore-status", "off",
-                   master_name],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "-f", "--ignore-status", "off",
+                            master_name], fail=True)
 
     # Verify we can't transform back to online when not yet powered on
-    AssertCommand(["gnt-node", "modify", "-O", "no", node_name],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-node", "modify", "-O", "no", node_name],
+                           fail=True)
     # Now reset state
-    AssertCommand(["gnt-node", "modify", "-O", "no", "--node-powered", "yes",
-                   node_name])
+    qa_utils.AssertCommand(["gnt-node", "modify", "-O", "no", "--node-powered",
+                            "yes", node_name])
 
-    AssertCommand(["gnt-node", "power", "-f", "cycle", node_name])
+    qa_utils.AssertCommand(["gnt-node", "power", "-f", "cycle", node_name])
     _AssertOobCall(verify_path, "power-cycle %s" % full_node_name)
 
     # Those commands should fail as they expect output which isn't provided yet
     # But they should have called the oob helper nevermind
-    AssertCommand(["gnt-node", "power", "status", node_name],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "status", node_name],
+                           fail=True)
     _AssertOobCall(verify_path, "power-status %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "health", node_name],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-node", "health", node_name], fail=True)
     _AssertOobCall(verify_path, "health %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "health"], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "health"], fail=True)
 
     # Correct Data, exit 0
     _UpdateOobFile(data_path, serializer.DumpJson({"powered": True}))
 
-    AssertCommand(["gnt-node", "power", "status", node_name])
+    qa_utils.AssertCommand(["gnt-node", "power", "status", node_name])
     _AssertOobCall(verify_path, "power-status %s" % full_node_name)
 
     _UpdateOobFile(data_path, serializer.DumpJson([["temp", "OK"],
                                                    ["disk0", "CRITICAL"]]))
 
-    AssertCommand(["gnt-node", "health", node_name])
+    qa_utils.AssertCommand(["gnt-node", "health", node_name])
     _AssertOobCall(verify_path, "health %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "health"])
+    qa_utils.AssertCommand(["gnt-node", "health"])
 
     # Those commands should fail as they expect no data regardless of exit 0
-    AssertCommand(["gnt-node", "power", "on", node_name], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "on", node_name], fail=True)
     _AssertOobCall(verify_path, "power-on %s" % full_node_name)
 
     try:
-      AssertCommand(["gnt-node", "power", "-f", "off", node_name], fail=True)
+      qa_utils.AssertCommand(["gnt-node", "power", "-f", "off", node_name],
+                             fail=True)
       _AssertOobCall(verify_path, "power-off %s" % full_node_name)
     finally:
-      AssertCommand(["gnt-node", "modify", "-O", "no", node_name])
+      qa_utils.AssertCommand(["gnt-node", "modify", "-O", "no", node_name])
 
-    AssertCommand(["gnt-node", "power", "-f", "cycle", node_name], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "-f", "cycle", node_name],
+                           fail=True)
     _AssertOobCall(verify_path, "power-cycle %s" % full_node_name)
 
     # Data, exit 1 (all should fail)
     _UpdateOobFile(exit_code_path, "1")
 
-    AssertCommand(["gnt-node", "power", "on", node_name], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "on", node_name], fail=True)
     _AssertOobCall(verify_path, "power-on %s" % full_node_name)
 
     try:
-      AssertCommand(["gnt-node", "power", "-f", "off", node_name], fail=True)
+      qa_utils.AssertCommand(["gnt-node", "power", "-f", "off", node_name],
+                             fail=True)
       _AssertOobCall(verify_path, "power-off %s" % full_node_name)
     finally:
-      AssertCommand(["gnt-node", "modify", "-O", "no", node_name])
+      qa_utils.AssertCommand(["gnt-node", "modify", "-O", "no", node_name])
 
-    AssertCommand(["gnt-node", "power", "-f", "cycle", node_name], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "-f", "cycle", node_name],
+                           fail=True)
     _AssertOobCall(verify_path, "power-cycle %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "power", "status", node_name],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "status", node_name],
+                           fail=True)
     _AssertOobCall(verify_path, "power-status %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "health", node_name],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-node", "health", node_name],
+                           fail=True)
     _AssertOobCall(verify_path, "health %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "health"], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "health"], fail=True)
 
     # No data, exit 1 (all should fail)
     _UpdateOobFile(data_path, "")
-    AssertCommand(["gnt-node", "power", "on", node_name], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "on", node_name], fail=True)
     _AssertOobCall(verify_path, "power-on %s" % full_node_name)
 
     try:
-      AssertCommand(["gnt-node", "power", "-f", "off", node_name], fail=True)
+      qa_utils.AssertCommand(["gnt-node", "power", "-f", "off", node_name],
+                             fail=True)
       _AssertOobCall(verify_path, "power-off %s" % full_node_name)
     finally:
-      AssertCommand(["gnt-node", "modify", "-O", "no", node_name])
+      qa_utils.AssertCommand(["gnt-node", "modify", "-O", "no", node_name])
 
-    AssertCommand(["gnt-node", "power", "-f", "cycle", node_name], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "-f", "cycle", node_name],
+                           fail=True)
     _AssertOobCall(verify_path, "power-cycle %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "power", "status", node_name],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-node", "power", "status", node_name],
+                           fail=True)
     _AssertOobCall(verify_path, "power-status %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "health", node_name],
-                  fail=True)
+    qa_utils.AssertCommand(["gnt-node", "health", node_name],
+                           fail=True)
     _AssertOobCall(verify_path, "health %s" % full_node_name)
 
-    AssertCommand(["gnt-node", "health"], fail=True)
+    qa_utils.AssertCommand(["gnt-node", "health"], fail=True)
 
     # Different OOB script for node
     verify_path2 = qa_utils.UploadData(master.primary, "")
@@ -469,19 +477,19 @@ def TestOutOfBand():
     oob_path2 = qa_utils.UploadData(master.primary, oob_script, mode=0o700)
 
     try:
-      AssertCommand(["gnt-node", "modify", "--node-parameters",
-                     "oob_program=%s" % oob_path2, node_name])
-      AssertCommand(["gnt-node", "power", "on", node_name])
+      qa_utils.AssertCommand(["gnt-node", "modify", "--node-parameters",
+                             "oob_program=%s" % oob_path2, node_name])
+      qa_utils.AssertCommand(["gnt-node", "power", "on", node_name])
       _AssertOobCall(verify_path2, "power-on %s" % full_node_name)
     finally:
-      AssertCommand(["gnt-node", "modify", "--node-parameters",
-                     "oob_program=default", node_name])
-      AssertCommand(["rm", "-f", oob_path2, verify_path2])
+      qa_utils.AssertCommand(["gnt-node", "modify", "--node-parameters",
+                             "oob_program=default", node_name])
+      qa_utils.AssertCommand(["rm", "-f", oob_path2, verify_path2])
   finally:
-    AssertCommand(["gnt-cluster", "modify", "--node-parameters",
-                   "oob_program="])
-    AssertCommand(["rm", "-f", oob_path, verify_path, data_path,
-                   exit_code_path])
+    qa_utils.AssertCommand(["gnt-cluster", "modify", "--node-parameters",
+                           "oob_program="])
+    qa_utils.AssertCommand(["rm", "-f", oob_path, verify_path, data_path,
+                            exit_code_path])
 
 
 def TestNodeList():
@@ -497,9 +505,9 @@ def TestNodeListFields():
 def TestNodeListDrbd(node, is_drbd):
   """gnt-node list-drbd"""
   master = qa_config.GetMasterNode()
-  result_output = GetCommandOutput(master.primary,
-                                   "gnt-node list-drbd --no-header %s" %
-                                   node.primary)
+  result_output = qa_utils.GetCommandOutput(master.primary,
+                                            "gnt-node list-drbd --no-header %s"
+                                            % node.primary)
   # Meaningful to note: there is but one instance, and the node is either the
   # primary or one of the secondaries
   if is_drbd:
@@ -538,4 +546,5 @@ def TestExclStorSingleNode(node):
   """
   for action in ["add", "modify"]:
     for value in (True, False, "default"):
-      AssertCommand(_BuildSetESCmd(action, value, node.primary), fail=True)
+      qa_utils.AssertCommand(_BuildSetESCmd(action, value, node.primary),
+                             fail=True)

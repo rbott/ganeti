@@ -42,7 +42,6 @@ from qa import qa_config
 from qa import qa_error
 from qa import qa_job_utils
 from qa import qa_utils
-from qa_utils import AssertCommand, GetCommandOutput
 
 
 def TestJobList():
@@ -63,14 +62,15 @@ def TestJobCancellation():
   # done. The second delay should be small enough that not too much time is
   # spend waiting in the case of a failed cancel and a running command.
   FIRST_COMMAND_DELAY = 10.0
-  AssertCommand(["gnt-debug", "delay", "--submit", str(FIRST_COMMAND_DELAY)])
+  qa_utils.AssertCommand(["gnt-debug", "delay", "--submit",
+                          str(FIRST_COMMAND_DELAY)])
 
   SECOND_COMMAND_DELAY = 3.0
   master = qa_config.GetMasterNode()
 
   # Forcing tty usage does not work on buildbot, so force all output of this
   # command to be redirected to stdout
-  job_id_output = GetCommandOutput(
+  job_id_output = qa_utils.GetCommandOutput(
     master.primary, "gnt-debug delay --submit %s 2>&1" % SECOND_COMMAND_DELAY
   )
 
@@ -79,11 +79,11 @@ def TestJobCancellation():
     raise qa_error.Error("Cannot parse gnt-debug delay output to find job id")
 
   job_id = possible_job_ids[0]
-  AssertCommand(["gnt-job", "cancel", job_id])
+  qa_utils.AssertCommand(["gnt-job", "cancel", job_id])
 
   # Now wait until the second job finishes, and expect the watch to fail due to
   # job cancellation
-  AssertCommand(["gnt-job", "watch", job_id], fail=True)
+  qa_utils.AssertCommand(["gnt-job", "watch", job_id], fail=True)
 
   # Then check for job cancellation
   job_status = qa_job_utils.GetJobStatus(job_id)

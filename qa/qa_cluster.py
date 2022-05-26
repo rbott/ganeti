@@ -52,8 +52,7 @@ from qa import qa_logging
 from qa import qa_rapi
 from qa import qa_utils
 
-from qa_utils import AssertEqual, AssertCommand, AssertRedirectedCommand, \
-  GetCommandOutput, CheckFileUnmodified
+from qa_utils import AssertEqual, AssertRedirectedCommand, CheckFileUnmodified
 
 
 # Prefix for LVM volumes created by QA code during tests
@@ -68,7 +67,7 @@ def _RemoveFileFromAllNodes(filename):
 
   """
   for node in qa_config.get("nodes"):
-    AssertCommand(["rm", "-f", filename], node=node)
+    qa_utils.AssertCommand(["rm", "-f", filename], node=node)
 
 
 def _CheckFileOnAllNodes(filename, content):
@@ -203,7 +202,7 @@ def AssertClusterHvParameterModify(param, value):
   """
 
   default_hv = qa_config.GetDefaultHypervisor()
-  AssertCommand(["gnt-cluster", "modify", "-H", "%s:%s=%s" %
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "-H", "%s:%s=%s" %
                  (default_hv, param, value)])
 
 
@@ -227,7 +226,7 @@ def AssertClusterVerify(fail=False, errors=None,
   mnode = qa_config.GetMasterNode()
   if errors or warnings or no_warnings:
     with CheckFileUnmodified(mnode.primary, pathutils.CLUSTER_CONF_FILE):
-      cvout = GetCommandOutput(mnode.primary, cvcmd + " --error-codes",
+      cvout = qa_utils.GetCommandOutput(mnode.primary, cvcmd + " --error-codes",
                                fail=(fail or errors))
     print(cvout)
     (act_errs, act_warns) = _GetCVErrorCodes(cvout)
@@ -240,7 +239,7 @@ def AssertClusterVerify(fail=False, errors=None,
 
   else:
     with CheckFileUnmodified(mnode.primary, pathutils.CLUSTER_CONF_FILE):
-      AssertCommand(cvcmd, fail=fail, node=mnode)
+      qa_utils.AssertCommand(cvcmd, fail=fail, node=mnode)
 
 
 # data for testing failures due to bad keys/values for disk parameters
@@ -254,7 +253,7 @@ def TestClusterInitDisk():
   """gnt-cluster init -D"""
   name = qa_config.get("name")
   for param in _FAIL_PARAMS:
-    AssertCommand(["gnt-cluster", "init", "-D", param, name], fail=True)
+    qa_utils.AssertCommand(["gnt-cluster", "init", "-D", param, name], fail=True)
 
 
 def TestClusterInit():
@@ -265,15 +264,15 @@ def TestClusterInit():
   if not qa_config.GetModifySshSetup():
     (key_type, _, priv_key_file, pub_key_file, auth_key_path) = \
       qa_config.GetSshConfig()
-    AssertCommand("echo -e 'y\n' | ssh-keygen -t %s -f %s -q -N ''"
+    qa_utils.AssertCommand("echo -e 'y\n' | ssh-keygen -t %s -f %s -q -N ''"
                   % (key_type, priv_key_file))
-    AssertCommand("cat %s >> %s" % (pub_key_file, auth_key_path))
+    qa_utils.AssertCommand("cat %s >> %s" % (pub_key_file, auth_key_path))
     for node in qa_config.get("nodes"):
       if node != master:
         for key_file in [priv_key_file, pub_key_file]:
-          AssertCommand("scp -oStrictHostKeyChecking=no %s %s:%s" %
+          qa_utils.AssertCommand("scp -oStrictHostKeyChecking=no %s %s:%s" %
                         (key_file, node.primary, key_file))
-        AssertCommand("ssh %s \'cat %s >> %s\'"
+        qa_utils.AssertCommand("ssh %s \'cat %s >> %s\'"
                       % (node.primary, pub_key_file, auth_key_path))
 
   # Initialize cluster
@@ -357,7 +356,7 @@ def TestClusterInit():
 
   cmd.append(qa_config.get("name"))
 
-  AssertCommand(cmd)
+  qa_utils.AssertCommand(cmd)
 
   cmd = ["gnt-cluster", "modify"]
 
@@ -371,18 +370,18 @@ def TestClusterInit():
     cmd.extend(["-B", bep])
 
   if len(cmd) > 2:
-    AssertCommand(cmd)
+    qa_utils.AssertCommand(cmd)
 
   # OS parameters
   osp = qa_config.get("os-parameters", {})
   for k, v in osp.items():
-    AssertCommand(["gnt-os", "modify", "-O", v, k])
+    qa_utils.AssertCommand(["gnt-os", "modify", "-O", v, k])
 
   # OS hypervisor parameters
   os_hvp = qa_config.get("os-hvp", {})
   for os_name in os_hvp:
     for hv, hvp in os_hvp[os_name].items():
-      AssertCommand(["gnt-os", "modify", "-H", "%s:%s" % (hv, hvp), os_name])
+      qa_utils.AssertCommand(["gnt-os", "modify", "-H", "%s:%s" % (hv, hvp), os_name])
 
 
 def TestClusterRename():
@@ -401,38 +400,38 @@ def TestClusterRename():
     cmd + [original_name],
     _CLUSTER_VERIFY,
     ]:
-    AssertCommand(data)
+    qa_utils.AssertCommand(data)
 
 
 def TestClusterOob():
   """out-of-band framework"""
   oob_path_exists = "/tmp/ganeti-qa-oob-does-exist-%s" % utils.NewUUID()
 
-  AssertCommand(_CLUSTER_VERIFY)
-  AssertCommand(["gnt-cluster", "modify", "--node-parameters",
+  qa_utils.AssertCommand(_CLUSTER_VERIFY)
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--node-parameters",
                  "oob_program=/tmp/ganeti-qa-oob-does-not-exist-%s" %
                  utils.NewUUID()])
 
-  AssertCommand(_CLUSTER_VERIFY, fail=True)
+  qa_utils.AssertCommand(_CLUSTER_VERIFY, fail=True)
 
-  AssertCommand(["touch", oob_path_exists])
-  AssertCommand(["chmod", "0400", oob_path_exists])
-  AssertCommand(["gnt-cluster", "copyfile", oob_path_exists])
+  qa_utils.AssertCommand(["touch", oob_path_exists])
+  qa_utils.AssertCommand(["chmod", "0400", oob_path_exists])
+  qa_utils.AssertCommand(["gnt-cluster", "copyfile", oob_path_exists])
 
   try:
-    AssertCommand(["gnt-cluster", "modify", "--node-parameters",
+    qa_utils.AssertCommand(["gnt-cluster", "modify", "--node-parameters",
                    "oob_program=%s" % oob_path_exists])
 
-    AssertCommand(_CLUSTER_VERIFY, fail=True)
+    qa_utils.AssertCommand(_CLUSTER_VERIFY, fail=True)
 
-    AssertCommand(["chmod", "0500", oob_path_exists])
-    AssertCommand(["gnt-cluster", "copyfile", oob_path_exists])
+    qa_utils.AssertCommand(["chmod", "0500", oob_path_exists])
+    qa_utils.AssertCommand(["gnt-cluster", "copyfile", oob_path_exists])
 
-    AssertCommand(_CLUSTER_VERIFY)
+    qa_utils.AssertCommand(_CLUSTER_VERIFY)
   finally:
-    AssertCommand(["gnt-cluster", "command", "rm", oob_path_exists])
+    qa_utils.AssertCommand(["gnt-cluster", "command", "rm", oob_path_exists])
 
-  AssertCommand(["gnt-cluster", "modify", "--node-parameters",
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--node-parameters",
                  "oob_program="])
 
 
@@ -441,36 +440,36 @@ def TestClusterEpo():
   master = qa_config.GetMasterNode()
 
   # Assert that OOB is unavailable for all nodes
-  result_output = GetCommandOutput(master.primary,
+  result_output = qa_utils.GetCommandOutput(master.primary,
                                    "gnt-node list --verbose --no-headers -o"
                                    " powered")
   AssertEqual(compat.all(powered == "(unavail)"
                          for powered in result_output.splitlines()), True)
 
   # Conflicting
-  AssertCommand(["gnt-cluster", "epo", "--groups", "--all"], fail=True)
+  qa_utils.AssertCommand(["gnt-cluster", "epo", "--groups", "--all"], fail=True)
   # --all doesn't expect arguments
-  AssertCommand(["gnt-cluster", "epo", "--all", "some_arg"], fail=True)
+  qa_utils.AssertCommand(["gnt-cluster", "epo", "--all", "some_arg"], fail=True)
 
   # Unless --all is given master is not allowed to be in the list
-  AssertCommand(["gnt-cluster", "epo", "-f", master.primary], fail=True)
+  qa_utils.AssertCommand(["gnt-cluster", "epo", "-f", master.primary], fail=True)
 
   with qa_job_utils.PausedWatcher():
     # This shouldn't fail
-    AssertCommand(["gnt-cluster", "epo", "-f", "--all"])
+    qa_utils.AssertCommand(["gnt-cluster", "epo", "-f", "--all"])
 
     # All instances should have been stopped now
-    result_output = GetCommandOutput(master.primary,
+    result_output = qa_utils.GetCommandOutput(master.primary,
                                      "gnt-instance list --no-headers -o status")
     # ERROR_down because the instance is stopped but not recorded as such
     AssertEqual(compat.all(status == "ERROR_down"
                            for status in result_output.splitlines()), True)
 
     # Now start everything again
-    AssertCommand(["gnt-cluster", "epo", "--on", "-f", "--all"])
+    qa_utils.AssertCommand(["gnt-cluster", "epo", "--on", "-f", "--all"])
 
     # All instances should have been started now
-    result_output = GetCommandOutput(master.primary,
+    result_output = qa_utils.GetCommandOutput(master.primary,
                                      "gnt-instance list --no-headers -o status")
     AssertEqual(compat.all(status == "running"
                            for status in result_output.splitlines()), True)
@@ -478,8 +477,8 @@ def TestClusterEpo():
 
 def TestClusterVerify():
   """gnt-cluster verify"""
-  AssertCommand(_CLUSTER_VERIFY)
-  AssertCommand(["gnt-cluster", "verify-disks"])
+  qa_utils.AssertCommand(_CLUSTER_VERIFY)
+  qa_utils.AssertCommand(["gnt-cluster", "verify-disks"])
 
 
 def TestClusterVerifyDisksBrokenDRBD(instance, inst_nodes):
@@ -500,36 +499,36 @@ def TestClusterVerifyDisksBrokenDRBD(instance, inst_nodes):
           "(drbdsetup %d detach >/dev/null 2>&1;" \
           " drbdsetup detach %d >/dev/null 2>&1) || /bin/true" % \
           (minor, minor)
-      AssertCommand(break_drbd_cmd, node=snode)
+      qa_utils.AssertCommand(break_drbd_cmd, node=snode)
 
-    verify_output = GetCommandOutput(qa_config.GetMasterNode().primary,
+    verify_output = qa_utils.GetCommandOutput(qa_config.GetMasterNode().primary,
                                      "gnt-cluster verify-disks")
     activation_msg = "Activating disks for instance '%s'" % instance.name
     if activation_msg not in verify_output:
       raise qa_error.Error("gnt-cluster verify-disks did not activate broken"
                            " DRBD disks:\n%s" % verify_output)
 
-    verify_output = GetCommandOutput(qa_config.GetMasterNode().primary,
+    verify_output = qa_utils.GetCommandOutput(qa_config.GetMasterNode().primary,
                                      "gnt-cluster verify-disks")
     if activation_msg in verify_output:
       raise qa_error.Error("gnt-cluster verify-disks wants to activate broken"
                            " DRBD disks on second attempt:\n%s" % verify_output)
 
-    AssertCommand(_CLUSTER_VERIFY)
+    qa_utils.AssertCommand(_CLUSTER_VERIFY)
   finally:
     qa_daemon.TestResumeWatcher()
 
 
 def TestJobqueue():
   """gnt-debug test-jobqueue"""
-  AssertCommand(["gnt-debug", "test-jobqueue"])
+  qa_utils.AssertCommand(["gnt-debug", "test-jobqueue"])
 
 
 def TestDelay(node):
   """gnt-debug delay"""
-  AssertCommand(["gnt-debug", "delay", "1"])
-  AssertCommand(["gnt-debug", "delay", "--no-master", "1"])
-  AssertCommand(["gnt-debug", "delay", "--no-master",
+  qa_utils.AssertCommand(["gnt-debug", "delay", "1"])
+  qa_utils.AssertCommand(["gnt-debug", "delay", "--no-master", "1"])
+  qa_utils.AssertCommand(["gnt-debug", "delay", "--no-master",
                  "-n", node.primary, "1"])
 
 
@@ -545,36 +544,36 @@ def TestClusterReservedLvs():
   # Clean cluster
   AssertClusterVerify()
 
-  AssertCommand(["gnt-cluster", "modify", "--reserved-lvs", ""])
-  AssertCommand(["lvcreate", "-L1G", "-n", lvname, vgname])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--reserved-lvs", ""])
+  qa_utils.AssertCommand(["lvcreate", "-L1G", "-n", lvname, vgname])
   AssertClusterVerify(fail=False,
                       warnings=[constants.CV_ENODEORPHANLV])
 
-  AssertCommand(["gnt-cluster", "modify", "--reserved-lvs",
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--reserved-lvs",
                  "%s,.*/other-test" % lvfullname])
   AssertClusterVerify(no_warnings=[constants.CV_ENODEORPHANLV])
 
-  AssertCommand(["gnt-cluster", "modify", "--reserved-lvs",
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--reserved-lvs",
                 ".*/%s.*" % _QA_LV_PREFIX])
   AssertClusterVerify(no_warnings=[constants.CV_ENODEORPHANLV])
 
-  AssertCommand(["gnt-cluster", "modify", "--reserved-lvs", ""])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--reserved-lvs", ""])
   AssertClusterVerify(fail=False,
                       warnings=[constants.CV_ENODEORPHANLV])
 
-  AssertCommand(["lvremove", "-f", lvfullname])
+  qa_utils.AssertCommand(["lvremove", "-f", lvfullname])
   AssertClusterVerify()
 
 
 def TestClusterModifyEmpty():
   """gnt-cluster modify"""
-  AssertCommand(["gnt-cluster", "modify"], fail=True)
+  qa_utils.AssertCommand(["gnt-cluster", "modify"], fail=True)
 
 
 def TestClusterModifyDisk():
   """gnt-cluster modify -D"""
   for param in _FAIL_PARAMS:
-    AssertCommand(["gnt-cluster", "modify", "-D", param], fail=True)
+    qa_utils.AssertCommand(["gnt-cluster", "modify", "-D", param], fail=True)
 
 
 def _GetOtherEnabledDiskTemplate(undesired_disk_templates,
@@ -668,7 +667,7 @@ def TestClusterModifyFileBasedStorageDir(
              "--enabled-disk-templates=%s" % ",".join(enabled_disk_templates),
              "--ipolicy-disk-templates=%s" % ",".join(enabled_disk_templates)])
     ]:
-    AssertCommand(cmd, fail=fail)
+    qa_utils.AssertCommand(cmd, fail=fail)
 
 
 def TestClusterModifyFileStorageDir():
@@ -714,10 +713,10 @@ def TestClusterModifyInstallImage():
   master = qa_config.GetMasterNode()
 
   image = \
-      GetCommandOutput(master.primary,
+      qa_utils.GetCommandOutput(master.primary,
                        "mktemp --tmpdir ganeti-install-image.XXXXXX").strip()
-  AssertCommand(["gnt-cluster", "modify", "--install-image=%s" % image])
-  AssertCommand(["rm", image])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--install-image=%s" % image])
+  qa_utils.AssertCommand(["rm", image])
 
 
 def _RestoreEnabledDiskTemplates():
@@ -737,7 +736,7 @@ def _RestoreEnabledDiskTemplates():
     vgname = qa_config.get("vg-name", constants.DEFAULT_VG)
     cmd.append("--vg-name=%s" % vgname)
 
-  AssertCommand(cmd, fail=False)
+  qa_utils.AssertCommand(cmd, fail=False)
 
 
 def _TestClusterModifyDiskTemplatesDrbdHelper(enabled_disk_templates):
@@ -786,7 +785,7 @@ def _TestClusterModifyDiskTemplatesDrbdHelper(enabled_disk_templates):
       "--enabled-disk-templates=%s" % constants.DT_DRBD8,
       "--ipolicy-disk-templates=%s" % constants.DT_DRBD8], False),
     ]:
-    AssertCommand(command, fail=fail)
+    qa_utils.AssertCommand(command, fail=fail)
   _RestoreEnabledDiskTemplates()
 
 
@@ -799,12 +798,12 @@ def _TestClusterModifyDiskTemplatesArguments(default_disk_template):
   _RestoreEnabledDiskTemplates()
 
   # bogus templates
-  AssertCommand(["gnt-cluster", "modify",
+  qa_utils.AssertCommand(["gnt-cluster", "modify",
                  "--enabled-disk-templates=pinkbunny"],
                 fail=True)
 
   # duplicate entries do no harm
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s,%s" %
       (default_disk_template, default_disk_template),
@@ -830,7 +829,7 @@ def _TestClusterModifyDiskTemplatesVgName(enabled_disk_templates):
   vgname = qa_config.get("vg-name", constants.DEFAULT_VG)
 
   # Clean start: unset volume group name, disable lvm storage
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % non_lvm_template,
      "--ipolicy-disk-templates=%s" % non_lvm_template,
@@ -838,17 +837,17 @@ def _TestClusterModifyDiskTemplatesVgName(enabled_disk_templates):
     fail=False)
 
   # Try to enable lvm, when no volume group is given
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % lvm_template,
      "--ipolicy-disk-templates=%s" % lvm_template],
     fail=True)
 
   # Set volume group, with lvm still disabled: just a warning
-  AssertCommand(["gnt-cluster", "modify", "--vg-name=%s" % vgname], fail=False)
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--vg-name=%s" % vgname], fail=False)
 
   # Try unsetting vg name and enabling lvm at the same time
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % lvm_template,
      "--ipolicy-disk-templates=%s" % lvm_template,
@@ -856,17 +855,17 @@ def _TestClusterModifyDiskTemplatesVgName(enabled_disk_templates):
     fail=True)
 
   # Enable lvm with vg name present
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % lvm_template,
      "--ipolicy-disk-templates=%s" % lvm_template],
     fail=False)
 
   # Try unsetting vg name with lvm still enabled
-  AssertCommand(["gnt-cluster", "modify", "--vg-name="], fail=True)
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--vg-name="], fail=True)
 
   # Disable lvm with vg name still set
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % non_lvm_template,
      "--ipolicy-disk-templates=%s" % non_lvm_template,
@@ -874,10 +873,10 @@ def _TestClusterModifyDiskTemplatesVgName(enabled_disk_templates):
     fail=False)
 
   # Try unsetting vg name with lvm disabled
-  AssertCommand(["gnt-cluster", "modify", "--vg-name="], fail=False)
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--vg-name="], fail=False)
 
   # Set vg name and enable lvm at the same time
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % lvm_template,
      "--ipolicy-disk-templates=%s" % lvm_template,
@@ -885,7 +884,7 @@ def _TestClusterModifyDiskTemplatesVgName(enabled_disk_templates):
     fail=False)
 
   # Unset vg name and disable lvm at the same time
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % non_lvm_template,
      "--ipolicy-disk-templates=%s" % non_lvm_template,
@@ -909,7 +908,7 @@ def _TestClusterModifyUsedDiskTemplate(instance_template,
   if not new_disk_templates:
     new_disk_templates = list(set([constants.DT_DISKLESS, constants.DT_BLOCK])
                                 - set([instance_template]))
-  AssertCommand(
+  qa_utils.AssertCommand(
     ["gnt-cluster", "modify",
      "--enabled-disk-templates=%s" % ",".join(new_disk_templates),
      "--ipolicy-disk-templates=%s" % ",".join(new_disk_templates)],
@@ -944,12 +943,12 @@ def TestClusterModifyBe():
     (False, ["gnt-cluster", "modify", "-B", "auto_balance=True"]),
     (False, ["sh", "-c", "gnt-cluster info|grep '^ *auto_balance: True$'"]),
     ]:
-    AssertCommand(cmd, fail=fail)
+    qa_utils.AssertCommand(cmd, fail=fail)
 
   # redo the original-requested BE parameters, if any
   bep = qa_config.get("backend-parameters", "")
   if bep:
-    AssertCommand(["gnt-cluster", "modify", "-B", bep])
+    qa_utils.AssertCommand(["gnt-cluster", "modify", "-B", bep])
 
 
 def _GetClusterIPolicy():
@@ -989,7 +988,7 @@ def TestClusterModifyIPolicy():
       ]
     for (good, val) in test_values:
       cmd = basecmd + ["--ipolicy-%s=%s" % (par, val)]
-      AssertCommand(cmd, fail=not good)
+      qa_utils.AssertCommand(cmd, fail=not good)
       if good:
         curr_val = val
       # Check the affected parameter
@@ -1021,7 +1020,7 @@ def TestClusterModifyIPolicy():
     ]
   for (good, val) in test_values:
     cmd = basecmd + ["--ipolicy-%s=%s" % (par, val)]
-    AssertCommand(cmd, fail=not good)
+    qa_utils.AssertCommand(cmd, fail=not good)
     if good:
       curr_val = val
     # Check the affected parameter
@@ -1104,7 +1103,7 @@ def TestClusterModifyISpecs():
 
     # Get the ipolicy command
     mnode = qa_config.GetMasterNode()
-    initcmd = GetCommandOutput(mnode.primary, "gnt-cluster show-ispecs-cmd")
+    initcmd = qa_utils.GetCommandOutput(mnode.primary, "gnt-cluster show-ispecs-cmd")
     modcmd = ["gnt-cluster", "modify"]
     opts = initcmd.split()
     assert opts[0:2] == ["gnt-cluster", "init"]
@@ -1113,8 +1112,8 @@ def TestClusterModifyISpecs():
         assert k + 2 <= len(opts)
         modcmd.extend(opts[k:k + 2])
     # Re-apply the ipolicy (this should be a no-op)
-    AssertCommand(modcmd)
-    new_initcmd = GetCommandOutput(mnode.primary, "gnt-cluster show-ispecs-cmd")
+    qa_utils.AssertCommand(modcmd)
+    new_initcmd = qa_utils.GetCommandOutput(mnode.primary, "gnt-cluster show-ispecs-cmd")
     AssertEqual(initcmd, new_initcmd)
 
 
@@ -1124,18 +1123,18 @@ def _TestClusterModifyUserShutdownXen(nodes):
   Note that for the Xen hypervisor, the KVM daemon should never run.
 
   """
-  AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
 
   # Give time for kvmd to start and stop on all nodes
   time.sleep(5)
 
   for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
+    qa_utils.AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
 
-  AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
 
   for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
+    qa_utils.AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
 
 
 def _TestClusterModifyUserShutdownKvm(nodes):
@@ -1149,10 +1148,10 @@ def _TestClusterModifyUserShutdownKvm(nodes):
   kvmd_cycle_time = 4
 
   # Start kvmd on all nodes
-  AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
   time.sleep(kvmd_cycle_time)
   for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node)
+    qa_utils.AssertCommand("pgrep ganeti-kvmd", node=node)
 
   # Test VM capable node attribute
   test_node = None
@@ -1167,35 +1166,35 @@ def _TestClusterModifyUserShutdownKvm(nodes):
     raise qa_error.Error("Failed to find viable node for this test")
 
   # Stop kvmd by disabling vm capable
-  AssertCommand(["gnt-node", "modify", "--vm-capable=no", test_node.primary])
+  qa_utils.AssertCommand(["gnt-node", "modify", "--vm-capable=no", test_node.primary])
   time.sleep(kvmd_cycle_time)
-  AssertCommand("pgrep ganeti-kvmd", node=test_node, fail=True)
+  qa_utils.AssertCommand("pgrep ganeti-kvmd", node=test_node, fail=True)
 
   # Start kvmd by enabling vm capable
-  AssertCommand(["gnt-node", "modify", "--vm-capable=yes", test_node.primary])
+  qa_utils.AssertCommand(["gnt-node", "modify", "--vm-capable=yes", test_node.primary])
   time.sleep(kvmd_cycle_time)
-  AssertCommand("pgrep ganeti-kvmd", node=test_node)
+  qa_utils.AssertCommand("pgrep ganeti-kvmd", node=test_node)
 
   # Stop kvmd on all nodes by removing KVM from the enabled hypervisors
   enabled_hypervisors = qa_config.GetEnabledHypervisors()
 
-  AssertCommand(["gnt-cluster", "modify", "--enabled-hypervisors=xen-pvm"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--enabled-hypervisors=xen-pvm"])
   time.sleep(kvmd_cycle_time)
   for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
+    qa_utils.AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
 
   # Start kvmd on all nodes by restoring KVM to the enabled hypervisors
-  AssertCommand(["gnt-cluster", "modify",
+  qa_utils.AssertCommand(["gnt-cluster", "modify",
                  "--enabled-hypervisors=%s" % ",".join(enabled_hypervisors)])
   time.sleep(kvmd_cycle_time)
   for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node)
+    qa_utils.AssertCommand("pgrep ganeti-kvmd", node=node)
 
   # Stop kvmd on all nodes
-  AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
   time.sleep(kvmd_cycle_time)
   for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
+    qa_utils.AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
 
 
 def TestClusterModifyUserShutdown():
@@ -1219,22 +1218,22 @@ def TestClusterModifyUserShutdown():
 
 def TestClusterInfo():
   """gnt-cluster info"""
-  AssertCommand(["gnt-cluster", "info"])
+  qa_utils.AssertCommand(["gnt-cluster", "info"])
 
 
 def TestClusterRedistConf():
   """gnt-cluster redist-conf"""
-  AssertCommand(["gnt-cluster", "redist-conf"])
+  qa_utils.AssertCommand(["gnt-cluster", "redist-conf"])
 
 
 def TestClusterGetmaster():
   """gnt-cluster getmaster"""
-  AssertCommand(["gnt-cluster", "getmaster"])
+  qa_utils.AssertCommand(["gnt-cluster", "getmaster"])
 
 
 def TestClusterVersion():
   """gnt-cluster version"""
-  AssertCommand(["gnt-cluster", "version"])
+  qa_utils.AssertCommand(["gnt-cluster", "version"])
 
 
 def _AssertSsconfCertFiles():
@@ -1251,7 +1250,7 @@ def _AssertSsconfCertFiles():
   for node in nodes:
     cmd = ["cat", ssconf_file]
     print("Ssconf Master Certificates of node '%s'." % node.primary)
-    result_output = GetCommandOutput(node.primary, utils.ShellQuoteArgs(cmd))
+    result_output = qa_utils.GetCommandOutput(node.primary, utils.ShellQuoteArgs(cmd))
     ssconf_content[node] = result_output
 
     # Clean up result to make it comparable:
@@ -1278,10 +1277,10 @@ def _TestSSHKeyChanges(master_node):
   """
   # Helper fn to avoid specifying base params too many times
   def _RenewWithParams(new_params, verify=True, fail=False):
-    AssertCommand(["gnt-cluster", "renew-crypto", "--new-ssh-keys", "-f",
+    qa_utils.AssertCommand(["gnt-cluster", "renew-crypto", "--new-ssh-keys", "-f",
                    "--no-ssh-key-check"] + new_params, fail=fail)
     if not fail and verify:
-      AssertCommand(["gnt-cluster", "verify"])
+      qa_utils.AssertCommand(["gnt-cluster", "verify"])
 
   # First test the simplest change
   _RenewWithParams([])
@@ -1298,7 +1297,7 @@ def _TestSSHKeyChanges(master_node):
 
     # Another helper function for checking whether a specific key can log in
     def _CheckLoginWithKey(key_path, fail=False):
-      AssertCommand(["ssh", "-oIdentityFile=%s" % key_path, "-oBatchMode=yes",
+      qa_utils.AssertCommand(["ssh", "-oIdentityFile=%s" % key_path, "-oBatchMode=yes",
                      "-oStrictHostKeyChecking=no", "-oIdentitiesOnly=yes",
                      "-F/dev/null", node_name, "true"],
                     fail=fail, forward_agent=False)
@@ -1315,7 +1314,7 @@ def _TestSSHKeyChanges(master_node):
       # And check that we cannot log in with the old key
       _CheckLoginWithKey(old_key_backup, fail=True)
     finally:
-      AssertCommand(["rm", "-f", old_key_backup])
+      qa_utils.AssertCommand(["rm", "-f", old_key_backup])
 
     _RenewWithParams(["--ssh-key-bits=4096"])
     _RenewWithParams(["--ssh-key-bits=521"], fail=True)
@@ -1338,12 +1337,12 @@ def TestClusterRenewCrypto():
     ["--new-cluster-domain-secret", "--cluster-domain-secret=/dev/null"],
     ]
   for i in conflicting:
-    AssertCommand(cmd + i, fail=True)
+    qa_utils.AssertCommand(cmd + i, fail=True)
 
   # Invalid RAPI certificate
   cmd = ["gnt-cluster", "renew-crypto", "--force",
          "--rapi-certificate=/dev/null"]
-  AssertCommand(cmd, fail=True)
+  qa_utils.AssertCommand(cmd, fail=True)
 
   rapi_cert_backup = qa_utils.BackupFile(master.primary,
                                          pathutils.RAPI_CERT_FILE)
@@ -1358,10 +1357,10 @@ def TestClusterRenewCrypto():
 
     tmpcert = qa_utils.UploadFile(master.primary, fh.name)
     try:
-      AssertCommand(["gnt-cluster", "renew-crypto", "--force",
+      qa_utils.AssertCommand(["gnt-cluster", "renew-crypto", "--force",
                      "--rapi-certificate=%s" % tmpcert])
     finally:
-      AssertCommand(["rm", "-f", tmpcert])
+      qa_utils.AssertCommand(["rm", "-f", tmpcert])
 
     # Custom cluster domain secret
     cds_fh = tempfile.NamedTemporaryFile(mode="w")
@@ -1371,42 +1370,42 @@ def TestClusterRenewCrypto():
 
     tmpcds = qa_utils.UploadFile(master.primary, cds_fh.name)
     try:
-      AssertCommand(["gnt-cluster", "renew-crypto", "--force",
+      qa_utils.AssertCommand(["gnt-cluster", "renew-crypto", "--force",
                      "--cluster-domain-secret=%s" % tmpcds])
     finally:
-      AssertCommand(["rm", "-f", tmpcds])
+      qa_utils.AssertCommand(["rm", "-f", tmpcds])
 
     # Normal case
-    AssertCommand(["gnt-cluster", "renew-crypto", "--force",
+    qa_utils.AssertCommand(["gnt-cluster", "renew-crypto", "--force",
                    "--new-cluster-certificate", "--new-confd-hmac-key",
                    "--new-rapi-certificate", "--new-cluster-domain-secret",
                    "--new-node-certificates", "--new-ssh-keys",
                    "--no-ssh-key-check"])
     _AssertSsconfCertFiles()
-    AssertCommand(["gnt-cluster", "verify"])
+    qa_utils.AssertCommand(["gnt-cluster", "verify"])
 
     # Only renew node certificates
-    AssertCommand(["gnt-cluster", "renew-crypto", "--force",
+    qa_utils.AssertCommand(["gnt-cluster", "renew-crypto", "--force",
                    "--new-node-certificates"])
     _AssertSsconfCertFiles()
-    AssertCommand(["gnt-cluster", "verify"])
+    qa_utils.AssertCommand(["gnt-cluster", "verify"])
 
     # Only renew cluster certificate
-    AssertCommand(["gnt-cluster", "renew-crypto", "--force",
+    qa_utils.AssertCommand(["gnt-cluster", "renew-crypto", "--force",
                    "--new-cluster-certificate"])
     _AssertSsconfCertFiles()
-    AssertCommand(["gnt-cluster", "verify"])
+    qa_utils.AssertCommand(["gnt-cluster", "verify"])
 
     # Comprehensively test various types of SSH key changes
     _TestSSHKeyChanges(master)
 
     # Restore RAPI certificate
-    AssertCommand(["gnt-cluster", "renew-crypto", "--force",
+    qa_utils.AssertCommand(["gnt-cluster", "renew-crypto", "--force",
                    "--rapi-certificate=%s" % rapi_cert_backup])
     _AssertSsconfCertFiles()
-    AssertCommand(["gnt-cluster", "verify"])
+    qa_utils.AssertCommand(["gnt-cluster", "verify"])
   finally:
-    AssertCommand(["rm", "-f", rapi_cert_backup])
+    qa_utils.AssertCommand(["rm", "-f", rapi_cert_backup])
 
   # Since renew-crypto replaced the RAPI cert, reload it.
   if qa_rapi.Enabled():
@@ -1465,9 +1464,9 @@ def TestClusterBurnin():
       else:
         cmd.append("--reboot-types=%s" % ",".join(reboot_types))
       cmd += [inst.name for inst in instances]
-      AssertCommand(cmd)
+      qa_utils.AssertCommand(cmd)
     finally:
-      AssertCommand(["rm", "-f", script])
+      qa_utils.AssertCommand(["rm", "-f", script])
 
   finally:
     for inst in instances:
@@ -1482,16 +1481,16 @@ def TestClusterMasterFailover():
   # Flush the configuration to prevent race conditions when loading it
   # on another node
   print(qa_logging.FormatInfo("Flushing the configuration on the master node"))
-  AssertCommand(["gnt-debug", "wconfd", "flushconfig"])
+  qa_utils.AssertCommand(["gnt-debug", "wconfd", "flushconfig"])
 
   cmd = ["gnt-cluster", "master-failover"]
   node_list_cmd = ["gnt-node", "list"]
   try:
-    AssertCommand(cmd, node=failovermaster)
-    AssertCommand(node_list_cmd, node=failovermaster)
+    qa_utils.AssertCommand(cmd, node=failovermaster)
+    qa_utils.AssertCommand(node_list_cmd, node=failovermaster)
     # Back to original master node
-    AssertCommand(cmd, node=master)
-    AssertCommand(node_list_cmd, node=master)
+    qa_utils.AssertCommand(cmd, node=master)
+    qa_utils.AssertCommand(node_list_cmd, node=master)
   finally:
     failovermaster.Release()
 
@@ -1529,7 +1528,7 @@ def TestUpgrade():
   # regardless of cluster defaults.
   if constants.VERSION_MINOR != 16:
     raise qa_error.Error("Please remove the key type downgrade code in 2.17")
-  AssertCommand(["gnt-cluster", "renew-crypto", "--no-ssh-key-check", "-f",
+  qa_utils.AssertCommand(["gnt-cluster", "renew-crypto", "--no-ssh-key-check", "-f",
                  "--new-ssh-keys", "--ssh-key-type=dsa"])
 
   AssertRedirectedCommand(["gnt-cluster", "upgrade", "--to", other_version])
@@ -1562,7 +1561,7 @@ def _AssertDrainFile(node, **kwargs):
   """Checks for the queue drain file.
 
   """
-  AssertCommand(["test", "-f", _NodeQueueDrainFile(node)], node=node, **kwargs)
+  qa_utils.AssertCommand(["test", "-f", _NodeQueueDrainFile(node)], node=node, **kwargs)
 
 
 def TestClusterMasterFailoverWithDrainedQueue():
@@ -1575,18 +1574,18 @@ def TestClusterMasterFailoverWithDrainedQueue():
     _AssertDrainFile(node, fail=True)
 
   # Drain queue on failover master
-  AssertCommand(["touch", _NodeQueueDrainFile(failovermaster)],
+  qa_utils.AssertCommand(["touch", _NodeQueueDrainFile(failovermaster)],
                 node=failovermaster)
 
   cmd = ["gnt-cluster", "master-failover"]
   try:
     _AssertDrainFile(failovermaster)
-    AssertCommand(cmd, node=failovermaster)
+    qa_utils.AssertCommand(cmd, node=failovermaster)
     _AssertDrainFile(master, fail=True)
     _AssertDrainFile(failovermaster, fail=True)
 
     # Back to original master node
-    AssertCommand(cmd, node=master)
+    qa_utils.AssertCommand(cmd, node=master)
   finally:
     failovermaster.Release()
 
@@ -1611,7 +1610,7 @@ def TestClusterCopyfile():
   testname = qa_utils.UploadFile(master.primary, f.name)
   try:
     # Copy file to all nodes
-    AssertCommand(["gnt-cluster", "copyfile", testname])
+    qa_utils.AssertCommand(["gnt-cluster", "copyfile", testname])
     _CheckFileOnAllNodes(testname, uniqueid)
   finally:
     _RemoveFileFromAllNodes(testname)
@@ -1626,7 +1625,7 @@ def TestClusterCommand():
                               "%s >%s" % (rcmd, rfile)])
 
   try:
-    AssertCommand(cmd)
+    qa_utils.AssertCommand(cmd)
     _CheckFileOnAllNodes(rfile, uniqueid)
   finally:
     _RemoveFileFromAllNodes(rfile)
@@ -1634,12 +1633,12 @@ def TestClusterCommand():
 
 def TestClusterDestroy():
   """gnt-cluster destroy"""
-  AssertCommand(["gnt-cluster", "destroy", "--yes-do-it"])
+  qa_utils.AssertCommand(["gnt-cluster", "destroy", "--yes-do-it"])
 
 
 def TestClusterRepairDiskSizes():
   """gnt-cluster repair-disk-sizes"""
-  AssertCommand(["gnt-cluster", "repair-disk-sizes"])
+  qa_utils.AssertCommand(["gnt-cluster", "repair-disk-sizes"])
 
 
 def TestSetExclStorCluster(newvalue):
@@ -1653,7 +1652,7 @@ def TestSetExclStorCluster(newvalue):
   """
   es_path = ["Default node parameters", "exclusive_storage"]
   oldvalue = _GetClusterField(es_path)
-  AssertCommand(["gnt-cluster", "modify", "--node-parameters",
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--node-parameters",
                  "exclusive_storage=%s" % newvalue])
   effvalue = _GetClusterField(es_path)
   if effvalue != newvalue:
@@ -1671,15 +1670,15 @@ def TestExclStorSharedPv(node):
   lvname1 = _QA_LV_PREFIX + "vol1"
   lvname2 = _QA_LV_PREFIX + "vol2"
   node_name = node.primary
-  AssertCommand(["lvcreate", "-L1G", "-n", lvname1, vgname], node=node_name)
+  qa_utils.AssertCommand(["lvcreate", "-L1G", "-n", lvname1, vgname], node=node_name)
   AssertClusterVerify(fail=False,
                       warnings=[constants.CV_ENODEORPHANLV])
-  AssertCommand(["lvcreate", "-L1G", "-n", lvname2, vgname], node=node_name)
+  qa_utils.AssertCommand(["lvcreate", "-L1G", "-n", lvname2, vgname], node=node_name)
   AssertClusterVerify(fail=True,
                       errors=[constants.CV_ENODELVM],
                       warnings=[constants.CV_ENODEORPHANLV])
-  AssertCommand(["lvremove", "-f", "/".join([vgname, lvname1])], node=node_name)
-  AssertCommand(["lvremove", "-f", "/".join([vgname, lvname2])], node=node_name)
+  qa_utils.AssertCommand(["lvremove", "-f", "/".join([vgname, lvname1])], node=node_name)
+  qa_utils.AssertCommand(["lvremove", "-f", "/".join([vgname, lvname2])], node=node_name)
   AssertClusterVerify()
 
 
@@ -1689,12 +1688,12 @@ def TestInstanceCommunication():
 
   # Check that the 'default' node group exists
   cmd = ["gnt-group", "list", "--no-headers", "-o", "name"]
-  result_output = GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
+  result_output = qa_utils.GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
   AssertEqual(result_output.strip(), "default", msg="Checking 'default' group")
 
   # Check that no networks exist
   cmd = ["gnt-network", "list", "--no-headers", "-o", "name"]
-  result_output = GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
+  result_output = qa_utils.GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
   AssertEqual(result_output.strip(), "", msg="Checking networks")
 
   # Modify cluster parameter 'instance-communication-network' and
@@ -1789,20 +1788,20 @@ def TestInstanceCommunication():
   print(result_output)
 
   cmd = ["gnt-network", "disconnect", network_name]
-  AssertCommand(utils.ShellQuoteArgs(cmd))
+  qa_utils.AssertCommand(utils.ShellQuoteArgs(cmd))
 
   cmd = ["gnt-network", "remove", network_name]
-  AssertCommand(utils.ShellQuoteArgs(cmd))
+  qa_utils.AssertCommand(utils.ShellQuoteArgs(cmd))
 
   cmd = ["gnt-group", "remove", group]
-  AssertCommand(utils.ShellQuoteArgs(cmd))
+  qa_utils.AssertCommand(utils.ShellQuoteArgs(cmd))
 
   # Check that the 'default' node group exists
   cmd = ["gnt-group", "list", "--no-headers", "-o", "name"]
-  result_output = GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
+  result_output = qa_utils.GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
   AssertEqual(result_output.strip(), "default", msg="Checking 'default' group")
 
   # Check that no networks exist
   cmd = ["gnt-network", "list", "--no-headers", "-o", "name"]
-  result_output = GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
+  result_output = qa_utils.GetCommandOutput(master.primary, utils.ShellQuoteArgs(cmd))
   AssertEqual(result_output.strip(), "", msg="Checking networks")

@@ -35,8 +35,7 @@
 from ganeti import utils
 
 from qa import qa_config
-
-from qa_utils import AssertCommand
+from qa import qa_utils
 
 
 def TestSshConnection():
@@ -44,7 +43,7 @@ def TestSshConnection():
 
   """
   for node in qa_config.get("nodes"):
-    AssertCommand("exit", node=node)
+    qa_utils.AssertCommand("exit", node=node)
 
 
 def TestGanetiCommands():
@@ -72,7 +71,7 @@ def TestGanetiCommands():
   cmd = " && ".join([utils.ShellQuoteArgs(i) for i in cmds])
 
   for node in qa_config.get("nodes"):
-    AssertCommand(cmd, node=node)
+    qa_utils.AssertCommand(cmd, node=node)
 
 
 def TestIcmpPing():
@@ -99,4 +98,4 @@ def TestIcmpPing():
     cmdall = pristr
 
   for node in nodes:
-    AssertCommand(cmdall, node=node)
+    qa_utils.AssertCommand(cmdall, node=node)

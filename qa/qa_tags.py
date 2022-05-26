@@ -35,8 +35,7 @@
 from ganeti import constants
 
 from qa import qa_rapi
-
-from qa_utils import AssertCommand
+from qa import qa_utils
 
 
 _TEMP_TAG_NAMES = ["TEMP-Ganeti-QA-Tag%d" % i for i in range(3)]
@@ -69,7 +68,7 @@ def _TestTags(kind, name):
     ["gnt-cluster", "search-tags", _TEMP_TAG_RE],
     cmdfn("remove-tags") + _TEMP_TAG_NAMES,
     ]:
-    AssertCommand(cmd)
+    qa_utils.AssertCommand(cmd)
 
   if qa_rapi.Enabled():
     qa_rapi.TestTags(kind, name, _TEMP_TAG_NAMES)

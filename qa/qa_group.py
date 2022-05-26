@@ -41,7 +41,7 @@ from qa import qa_iptables
 from qa import qa_config
 from qa import qa_utils
 
-from qa_utils import AssertCommand, AssertEqual, GetCommandOutput
+from qa_utils import AssertEqual
 
 
 def GetDefaultGroup():
@@ -83,9 +83,9 @@ def ModifyGroupSshPort(ipt_rules, group, nodes, ssh_port):
   """
   default_ssh_port = netutils.GetDaemonPort(constants.SSH)
   all_nodes = qa_config.get("nodes")
-  AssertCommand(["gnt-group", "modify",
-                 "--node-parameters=ssh_port=" + str(ssh_port),
-                 group])
+  qa_utils.AssertCommand(["gnt-group", "modify",
+                          "--node-parameters=ssh_port=" + str(ssh_port),
+                          group])
   for node in nodes:
     ipt_rules.RedirectPort(node.primary, "localhost",
                            default_ssh_port, 65535)
@@ -104,36 +104,39 @@ def TestGroupAddRemoveRename():
 
   (group1, group2, group3) = qa_utils.GetNonexistentGroups(3)
 
-  AssertCommand(["gnt-group", "add", group1])
-  AssertCommand(["gnt-group", "add", group2])
-  AssertCommand(["gnt-group", "add", group2], fail=True)
-  AssertCommand(["gnt-group", "add", existing_group_with_nodes], fail=True)
+  qa_utils.AssertCommand(["gnt-group", "add", group1])
+  qa_utils.AssertCommand(["gnt-group", "add", group2])
+  qa_utils.AssertCommand(["gnt-group", "add", group2], fail=True)
+  qa_utils.AssertCommand(["gnt-group", "add", existing_group_with_nodes],
+                         fail=True)
 
-  AssertCommand(["gnt-group", "rename", group1, group2], fail=True)
-  AssertCommand(["gnt-group", "rename", group1, group3])
+  qa_utils.AssertCommand(["gnt-group", "rename", group1, group2], fail=True)
+  qa_utils.AssertCommand(["gnt-group", "rename", group1, group3])
 
   try:
-    AssertCommand(["gnt-group", "rename", existing_group_with_nodes, group1])
+    qa_utils.AssertCommand(["gnt-group", "rename", existing_group_with_nodes,
+                            group1])
 
-    AssertCommand(["gnt-group", "remove", group2])
-    AssertCommand(["gnt-group", "remove", group3])
-    AssertCommand(["gnt-group", "remove", group1], fail=True)
+    qa_utils.AssertCommand(["gnt-group", "remove", group2])
+    qa_utils.AssertCommand(["gnt-group", "remove", group3])
+    qa_utils.AssertCommand(["gnt-group", "remove", group1], fail=True)
   finally:
     # Try to ensure idempotency re groups that already existed.
-    AssertCommand(["gnt-group", "rename", group1, existing_group_with_nodes])
+    qa_utils.AssertCommand(["gnt-group", "rename", group1,
+                            existing_group_with_nodes])
 
 
 def TestGroupAddWithOptions():
   """gnt-group add with options"""
   (group1, ) = qa_utils.GetNonexistentGroups(1)
 
-  AssertCommand(["gnt-group", "add", "--alloc-policy", "notvalid", group1],
-                fail=True)
+  qa_utils.AssertCommand(["gnt-group", "add", "--alloc-policy", "notvalid",
+                          group1], fail=True)
 
-  AssertCommand(["gnt-group", "add", "--alloc-policy", "last_resort",
-                 "--node-parameters", "oob_program=/bin/true", group1])
+  qa_utils.AssertCommand(["gnt-group", "add", "--alloc-policy", "last_resort",
+                          "--node-parameters", "oob_program=/bin/true", group1])
 
-  AssertCommand(["gnt-group", "remove", group1])
+  qa_utils.AssertCommand(["gnt-group", "remove", group1])
 
 
 class NewGroupCtx(object):
@@ -141,11 +144,11 @@ class NewGroupCtx(object):
 
   def __enter__(self):
     (self._group, ) = qa_utils.GetNonexistentGroups(1)
-    AssertCommand(["gnt-group", "add", self._group])
+    qa_utils.AssertCommand(["gnt-group", "add", self._group])
     return self._group
 
   def __exit__(self, exc_type, exc_val, exc_tb):
-    AssertCommand(["gnt-group", "remove", self._group])
+    qa_utils.AssertCommand(["gnt-group", "remove", self._group])
 
 
 def _GetGroupIPolicy(groupname):
@@ -236,13 +239,13 @@ def _TestGroupModifyISpecs(groupname):
       }
     _TestGroupSetISpecs(groupname, diff_specs=bad_specs, fail=True,
                         old_values=mod_values)
-  AssertCommand(["gnt-group", "modify", "--ipolicy-bounds-specs", "default",
-                 groupname])
+  qa_utils.AssertCommand(["gnt-group", "modify", "--ipolicy-bounds-specs",
+                          "default", groupname])
   AssertEqual(_GetGroupIPolicy(groupname), old_values)
 
   # Get the ipolicy command (from the cluster config)
   mnode = qa_config.GetMasterNode()
-  addcmd = GetCommandOutput(mnode.primary, utils.ShellQuoteArgs([
+  addcmd = qa_utils.GetCommandOutput(mnode.primary, utils.ShellQuoteArgs([
     "gnt-group", "show-ispecs-cmd", "--include-defaults", groupname,
     ]))
   modcmd = ["gnt-group", "modify"]
@@ -254,8 +257,8 @@ def _TestGroupModifyISpecs(groupname):
       modcmd.extend(opts[k:k + 2])
   modcmd.append(groupname)
   # Apply the ipolicy to the group and verify the result
-  AssertCommand(modcmd)
-  new_addcmd = GetCommandOutput(mnode.primary, utils.ShellQuoteArgs([
+  qa_utils.AssertCommand(modcmd)
+  new_addcmd = qa_utils.GetCommandOutput(mnode.primary, utils.ShellQuoteArgs([
     "gnt-group", "show-ispecs-cmd", groupname,
     ]))
   AssertEqual(addcmd, new_addcmd)
@@ -277,7 +280,7 @@ def _TestGroupModifyIPolicy(groupname):
     build_cmdline = lambda val: ["gnt-group", "modify", "--ipolicy-" + par,
                                  str(val), groupname]
 
-    AssertCommand(build_cmdline(setval))
+    qa_utils.AssertCommand(build_cmdline(setval))
     (new_policy, new_specs) = _GetGroupIPolicy(groupname)
     AssertEqual(new_specs, old_specs)
     for (p, val) in new_policy.items():
@@ -286,7 +289,7 @@ def _TestGroupModifyIPolicy(groupname):
       else:
         AssertEqual(val, old_policy[p])
 
-    AssertCommand(build_cmdline("default"))
+    qa_utils.AssertCommand(build_cmdline("default"))
     (new_policy, new_specs) = _GetGroupIPolicy(groupname)
     AssertEqual(new_specs, old_specs)
     AssertEqual(new_policy, old_policy)
@@ -300,22 +303,24 @@ def TestGroupModify():
     return
   (group1, ) = qa_utils.GetNonexistentGroups(1)
 
-  AssertCommand(["gnt-group", "add", group1])
+  qa_utils.AssertCommand(["gnt-group", "add", group1])
 
   try:
     _TestGroupModifyIPolicy(group1)
-    AssertCommand(["gnt-group", "modify", "--alloc-policy", "unallocable",
-                   "--node-parameters", "oob_program=/bin/false", group1])
-    AssertCommand(["gnt-group", "modify",
-                   "--alloc-policy", "notvalid", group1], fail=True)
-    AssertCommand(["gnt-group", "modify",
-                   "--node-parameters", "spindle_count=10", group1])
+    qa_utils.AssertCommand(["gnt-group", "modify", "--alloc-policy",
+                            "unallocable", "--node-parameters",
+                            "oob_program=/bin/false", group1])
+    qa_utils.AssertCommand(["gnt-group", "modify",
+                            "--alloc-policy", "notvalid", group1], fail=True)
+    qa_utils.AssertCommand(["gnt-group", "modify",
+                            "--node-parameters", "spindle_count=10", group1])
     if qa_config.TestEnabled("htools"):
-      AssertCommand(["hbal", "-L", "-G", group1])
-    AssertCommand(["gnt-group", "modify",
-                   "--node-parameters", "spindle_count=default", group1])
+      qa_utils.AssertCommand(["hbal", "-L", "-G", group1])
+    qa_utils.AssertCommand(["gnt-group", "modify",
+                            "--node-parameters", "spindle_count=default",
+                            group1])
   finally:
-    AssertCommand(["gnt-group", "remove", group1])
+    qa_utils.AssertCommand(["gnt-group", "remove", group1])
 
 
 def TestGroupList():
@@ -341,28 +346,31 @@ def TestAssignNodesIncludingSplit(orig_group, node1, node2):
   master_node = qa_config.GetMasterNode().primary
 
   def AssertInGroup(group, nodes):
-    real_output = GetCommandOutput(master_node,
+    real_output = qa_utils.GetCommandOutput(master_node,
                                    "gnt-node list --no-headers -o group " +
                                    utils.ShellQuoteArgs(nodes))
     AssertEqual(real_output.splitlines(), [group] * len(nodes))
 
   AssertInGroup(orig_group, [node1, node2])
-  AssertCommand(["gnt-group", "add", other_group])
+  qa_utils.AssertCommand(["gnt-group", "add", other_group])
 
   try:
-    AssertCommand(["gnt-group", "assign-nodes", other_group, node1, node2])
+    qa_utils.AssertCommand(["gnt-group", "assign-nodes", other_group, node1,
+                            node2])
     AssertInGroup(other_group, [node1, node2])
 
     # This should fail because moving node1 to orig_group would leave their
     # common instance split between orig_group and other_group.
-    AssertCommand(["gnt-group", "assign-nodes", orig_group, node1], fail=True)
+    qa_utils.AssertCommand(["gnt-group", "assign-nodes", orig_group, node1],
+                           fail=True)
     AssertInGroup(other_group, [node1, node2])
 
-    AssertCommand(["gnt-group", "assign-nodes", "--force", orig_group, node1])
+    qa_utils.AssertCommand(["gnt-group", "assign-nodes", "--force", orig_group,
+                            node1])
     AssertInGroup(orig_group, [node1])
     AssertInGroup(other_group, [node2])
 
-    AssertCommand(["gnt-group", "assign-nodes", orig_group, node2])
+    qa_utils.AssertCommand(["gnt-group", "assign-nodes", orig_group, node2])
     AssertInGroup(orig_group, [node1, node2])
   finally:
-    AssertCommand(["gnt-group", "remove", other_group])
+    qa_utils.AssertCommand(["gnt-group", "remove", other_group])

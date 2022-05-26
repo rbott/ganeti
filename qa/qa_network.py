@@ -38,8 +38,6 @@ from qa import qa_utils
 
 from ganeti import query
 
-from qa_utils import AssertCommand
-
 
 def TestNetworkList():
   """gnt-network list"""
@@ -67,18 +65,20 @@ def TestNetworkAddRemove():
 
   # Add some networks of different sizes.
   # Note: Using RFC5737 addresses.
-  AssertCommand(["gnt-network", "add", "--network", "192.0.2.0/30", network1])
-  AssertCommand(["gnt-network", "add", "--network", "198.51.100.0/24",
-                 network2])
+  qa_utils.AssertCommand(["gnt-network", "add", "--network", "192.0.2.0/30",
+                          network1])
+  qa_utils.AssertCommand(["gnt-network", "add", "--network", "198.51.100.0/24",
+                          network2])
   # Try to add a network with an existing name.
-  AssertCommand(["gnt-network", "add", "--network", "203.0.133.0/24", network2],
-                fail=True)
+  qa_utils.AssertCommand(["gnt-network", "add", "--network", "203.0.133.0/24",
+                          network2],
+                         fail=True)
 
   TestNetworkList()
   TestNetworkListFields()
 
-  AssertCommand(["gnt-network", "remove", network1])
-  AssertCommand(["gnt-network", "remove", network2])
+  qa_utils.AssertCommand(["gnt-network", "remove", network1])
+  qa_utils.AssertCommand(["gnt-network", "remove", network2])
 
   TestNetworkList()
 
@@ -86,9 +86,10 @@ def TestNetworkAddRemove():
 def TestNetworkTags():
   """gnt-network tags"""
   (network, ) = GetNonexistentNetworks(1)
-  AssertCommand(["gnt-network", "add", "--network", "192.0.2.0/30", network])
+  qa_utils.AssertCommand(["gnt-network", "add", "--network", "192.0.2.0/30",
+                          network])
   qa_tags.TestNetworkTags(network)
-  AssertCommand(["gnt-network", "remove", network])
+  qa_utils.AssertCommand(["gnt-network", "remove", network])
 
 
 def TestNetworkConnect():
@@ -108,15 +109,16 @@ def TestNetworkConnect():
 
   nicparams = "mode=%s,link=%s" % (mode, link)
 
-  AssertCommand(["gnt-group", "add", group1])
-  AssertCommand(["gnt-network", "add", "--network", "192.0.2.0/24", network1])
+  qa_utils.AssertCommand(["gnt-group", "add", group1])
+  qa_utils.AssertCommand(["gnt-network", "add", "--network", "192.0.2.0/24",
+                          network1])
 
-  AssertCommand(["gnt-network", "connect", "--nic-parameters", nicparams,
-                network1, group1])
+  qa_utils.AssertCommand(["gnt-network", "connect", "--nic-parameters",
+                          nicparams, network1, group1])
 
   TestNetworkList()
 
-  AssertCommand(["gnt-network", "disconnect", network1, group1])
+  qa_utils.AssertCommand(["gnt-network", "disconnect", network1, group1])
 
-  AssertCommand(["gnt-group", "remove", group1])
-  AssertCommand(["gnt-network", "remove", network1])
+  qa_utils.AssertCommand(["gnt-group", "remove", group1])
+  qa_utils.AssertCommand(["gnt-network", "remove", network1])

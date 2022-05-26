@@ -39,7 +39,7 @@ from ganeti.utils import retry
 
 from qa import qa_job_utils
 from qa import qa_utils
-from qa_utils import AssertCommand, AssertEqual, AssertIn, stdout_of
+from qa_utils import AssertEqual, AssertIn, stdout_of
 
 
 def GetJobStatus(job_id):
@@ -68,10 +68,10 @@ def KillWaitJobs(job_ids):
   # We use fail=None to ignore the exit code, since it can be non-zero
   # if the job is already terminated.
   for jid in job_ids:
-    AssertCommand(["gnt-job", "cancel", "--kill", "--yes-do-it", str(jid)],
+    qa_utils.AssertCommand(["gnt-job", "cancel", "--kill", "--yes-do-it", str(jid)],
                   fail=None)
   for jid in job_ids:
-    AssertCommand(["gnt-job", "watch", str(jid)], fail=None)
+    qa_utils.AssertCommand(["gnt-job", "watch", str(jid)], fail=None)
 
 
 def AssertStatusRetry(jid, status, interval=1.0, timeout=20.0):
@@ -115,7 +115,7 @@ def TestFilterAddRemove():
 
   AssertEqual(uuid1, uuid2)
 
-  AssertCommand(["gnt-filter", "delete", uuid1])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid1])
 
   TestFilterList()
 
@@ -150,7 +150,7 @@ def TestFilterWatermark():
                                                highest_jid2)
 
   # Clean up.
-  AssertCommand(["gnt-filter", "delete", uuid])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid])
 
 
 def TestFilterReject():
@@ -166,17 +166,17 @@ def TestFilterReject():
   ])
 
   # Newly queued jobs must now fail.
-  AssertCommand(["gnt-debug", "delay", "0.01"], fail=True)
+  qa_utils.AssertCommand(["gnt-debug", "delay", "0.01"], fail=True)
 
   # Clean up.
-  AssertCommand(["gnt-filter", "delete", uuid])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid])
 
 
 def TestFilterOpCode():
   """Tests that filtering with the "opcode" predicate works"""
 
   # Check that delay jobs work fine.
-  AssertCommand(["gnt-debug", "delay", "0.01"])
+  qa_utils.AssertCommand(["gnt-debug", "delay", "0.01"])
 
   # Add a filter that rejects all new delay jobs.
   uuid = stdout_of([
@@ -186,10 +186,10 @@ def TestFilterOpCode():
   ])
 
   # Newly queued delay jobs must now fail.
-  AssertCommand(["gnt-debug", "delay", "0.01"], fail=True)
+  qa_utils.AssertCommand(["gnt-debug", "delay", "0.01"], fail=True)
 
   # Clean up.
-  AssertCommand(["gnt-filter", "delete", uuid])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid])
 
 
 def TestFilterContinue():
@@ -212,16 +212,16 @@ def TestFilterContinue():
   ])
 
   # Newly queued jobs must now fail.
-  AssertCommand(["gnt-debug", "delay", "0.01"], fail=True)
+  qa_utils.AssertCommand(["gnt-debug", "delay", "0.01"], fail=True)
 
   # Delete the rejecting filter.
-  AssertCommand(["gnt-filter", "delete", uuid_reject])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid_reject])
 
   # Newly queued jobs must now succeed.
-  AssertCommand(["gnt-debug", "delay", "0.01"])
+  qa_utils.AssertCommand(["gnt-debug", "delay", "0.01"])
 
   # Clean up.
-  AssertCommand(["gnt-filter", "delete", uuid_cont])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid_cont])
 
 
 def TestFilterReasonChain():
@@ -251,12 +251,12 @@ def TestFilterReasonChain():
   ])
 
   # This job must now go into queued status.
-  AssertCommand(["gnt-debug", "delay", "0.01"], fail=True)
-  AssertCommand(["gnt-debug", "delay", "--reason=allow this", "0.01"])
+  qa_utils.AssertCommand(["gnt-debug", "delay", "0.01"], fail=True)
+  qa_utils.AssertCommand(["gnt-debug", "delay", "--reason=allow this", "0.01"])
 
   # Clean up.
-  AssertCommand(["gnt-filter", "delete", uuid1])
-  AssertCommand(["gnt-filter", "delete", uuid2])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid1])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid2])
 
 
 def TestFilterAcceptPause():
@@ -264,7 +264,7 @@ def TestFilterAcceptPause():
   and that the ACCEPT filter immediately allows starting.
   """
 
-  AssertCommand(["gnt-cluster", "watcher", "pause", "600"])
+  qa_utils.AssertCommand(["gnt-cluster", "watcher", "pause", "600"])
 
   # Add a filter chain that pauses all new jobs apart from those with a
   # specific reason.
@@ -305,14 +305,14 @@ def TestFilterAcceptPause():
   AssertStatusRetry(jid2, "success")  # job should not be paused
 
   # Delete the filters.
-  AssertCommand(["gnt-filter", "delete", uuid1])
-  AssertCommand(["gnt-filter", "delete", uuid2])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid1])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid2])
 
   # Now the paused job should run through.
   time.sleep(5)
   AssertStatusRetry(jid1, "success")
 
-  AssertCommand(["gnt-cluster", "watcher", "continue"])
+  qa_utils.AssertCommand(["gnt-cluster", "watcher", "continue"])
 
 
 def TestFilterRateLimit():
@@ -322,9 +322,9 @@ def TestFilterRateLimit():
 
   # Make sure our test is not constrained by "max-running-jobs"
   # (simply set it to the default).
-  AssertCommand(["gnt-cluster", "modify", "--max-running-jobs=20"])
-  AssertCommand(["gnt-cluster", "modify", "--max-tracked-jobs=25"])
-  AssertCommand(["gnt-cluster", "watcher", "pause", "600"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--max-running-jobs=20"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--max-tracked-jobs=25"])
+  qa_utils.AssertCommand(["gnt-cluster", "watcher", "pause", "600"])
 
   # Add a filter that rejects all new jobs.
   uuid = stdout_of([
@@ -353,9 +353,9 @@ def TestFilterRateLimit():
   AssertEqual(GetJobStatus(jid3), "queued", msg="Job should be rate-limited")
 
   # Clean up.
-  AssertCommand(["gnt-filter", "delete", uuid])
+  qa_utils.AssertCommand(["gnt-filter", "delete", uuid])
   KillWaitJobs([jid1, jid2, jid3])
-  AssertCommand(["gnt-cluster", "watcher", "continue"])
+  qa_utils.AssertCommand(["gnt-cluster", "watcher", "continue"])
 
 
 def TestAdHocReasonRateLimit():
@@ -364,8 +364,8 @@ def TestAdHocReasonRateLimit():
 
   # Make sure our test is not constrained by "max-running-jobs"
   # (simply set it to the default).
-  AssertCommand(["gnt-cluster", "modify", "--max-running-jobs=20"])
-  AssertCommand(["gnt-cluster", "modify", "--max-tracked-jobs=25"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--max-running-jobs=20"])
+  qa_utils.AssertCommand(["gnt-cluster", "modify", "--max-tracked-jobs=25"])
 
   # Only the first 2 jobs must be scheduled.
   jid1 = int(stdout_of([

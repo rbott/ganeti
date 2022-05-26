@@ -46,6 +46,7 @@ import subprocess
 import sys
 import tempfile
 import yaml
+import traceback
 
 try:
   import functools
@@ -291,6 +292,7 @@ def GetSSHCommand(node, cmd, strict=True, opts=None, tty=False,
   @param forward_agent: whether to forward the ssh agent or not
 
   """
+  global _MULTIPLEXERS
   args = ["ssh", "-oEscapeChar=none", "-oBatchMode=yes", "-lroot"]
 
   if tty is None:
@@ -310,9 +312,17 @@ def GetSSHCommand(node, cmd, strict=True, opts=None, tty=False,
   if opts:
     args.extend(opts)
   if node in _MULTIPLEXERS and use_multiplexer:
+    print("USING MULTIPLEXER for %s" % node)
     spath = _MULTIPLEXERS[node][0]
     args.append("-oControlPath=%s" % spath)
     args.append("-oControlMaster=no")
+  else:
+    print("NOT USING MULTIPLEXER for %s" % node)
+
+  print(_MULTIPLEXERS)
+  print(hex(id(_MULTIPLEXERS)))
+  for line in traceback.format_stack():
+      print(line.strip())
 
   (vcluster_master, vcluster_basedir) = \
     qa_config.GetVclusterSettings()
@@ -366,6 +376,7 @@ def StartMultiplexer(node):
   @param node: the node for which to open the multiplexer
 
   """
+  global _MULTIPLEXERS
   if node in _MULTIPLEXERS:
     return
 
