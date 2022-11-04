@@ -1176,7 +1176,8 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     @return: tuple (host, port, volume, path)
 
     """
-    m = re.fullmatch('^gluster:\/\/(?P<host>[a-z0-9-.]+):(?P<port>\d+)/(?P<volume>[^/]+)/(?P<path>.+)$')
+    m = re.fullmatch('^gluster:\/\/(?P<host>[a-z0-9-.]+):(?P<port>\d+)/'
+                     '(?P<volume>[^/]+)/(?P<path>.+)$', url)
     return m.group('host'), m.group('port'), m.group('volume'), m.group('path')
 
   def _GenerateKVMBlockDevicesOptions(self, up_hvp, kvm_disks,
