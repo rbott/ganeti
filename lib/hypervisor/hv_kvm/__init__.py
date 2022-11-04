@@ -2326,22 +2326,59 @@ class KVMHypervisor(hv_base.BaseHypervisor):
         "id": kvm_devid,
         "uri": _GetDriveURI(device, extra[0], extra[1]),
         "discard": up_hvp[constants.HV_DISK_DISCARD],
-        "aio_mode": up_hvp[constants.HV_KVM_DISK_AIO]
       }
 
       disk_info = new_runtime_entry[0]
-      if disk_info.dev_type in constants.DTS_FILEBASED:
-        bdev_params["driver_type"] = "file"
+      access_mode = disk_info.params.get(constants.LDP_ACCESS,
+                                         constants.DISK_KERNELSPACE)
+
+      if disk_info.dev_type == constants.DT_GLUSTER and access_mode == \
+              constants.DISK_USERSPACE:
+        blockdev_driver_type = _BLOCKDEV_DRIVER_GLUSTER
+      elif disk_info.dev_type in constants.DTS_FILEBASED:
+        blockdev_driver_type = _BLOCKDEV_DRIVER_FILE
       else:
-        bdev_params["driver_type"] = "host_device"
+        blockdev_driver_type = _BLOCKDEV_DRIVER_HOST_DEVICE
 
       writeback, direct, no_flush = _GetCacheSettings(
         up_hvp[constants.HV_DISK_CACHE], disk_info.dev_type)
-      bdev_params["cache_writeback"] = writeback
-      bdev_params["cache_direct"] = direct
-      bdev_params["cache_no_flush"] = no_flush
 
-      self.qmp.HotAddDisk(device, bdev_params)
+      file_driver = {}
+      target = _GetDriveURI(device, extra[0], extra[1])
+
+      if blockdev_driver_type in [_BLOCKDEV_DRIVER_FILE,
+                                  _BLOCKDEV_DRIVER_HOST_DEVICE]:
+        file_driver = {
+          "driver": blockdev_driver_type,
+          "filename": target,
+          "aio": up_hvp[constants.HV_KVM_DISK_AIO]
+        }
+      elif blockdev_driver_type == _BLOCKDEV_DRIVER_GLUSTER:
+        host, port, volume, path = self._ParseGlusterUrl(target)
+        file_driver = {
+          "server": [
+            {
+              'type': 'inet',
+              'host': host,
+              'port': port
+            }
+          ],
+          "volume": volume,
+          "path": path
+        }
+
+      blockdevice = {
+        "driver": "raw",
+        "node-name": kvm_devid,
+        "discard": up_hvp[constants.HV_DISK_DISCARD],
+        "cache": {
+          "direct": direct,
+          "no-flush": no_flush
+        },
+        "file": file_driver
+      }
+
+      self.qmp.HotAddDisk(device, access_mode, writeback, blockdevice)
     elif dev_type == constants.HOTPLUG_TARGET_NIC:
       kvmpath = instance.hvparams[constants.HV_KVM_PATH]
       is_chrooted = instance.hvparams[constants.HV_KVM_USE_CHROOT]

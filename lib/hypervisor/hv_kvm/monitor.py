@@ -546,51 +546,29 @@ class QmpConnection(MonitorSocket):
     self.Execute("netdev_del", {"id": devid})
 
   @_ensure_connection
-  def HotAddDisk(self, disk, bdev_params):
+  def HotAddDisk(self, disk, access_mode, cache_writeback, blockdevice):
     """Hot-add a disk
 
     """
 
-    if os.path.exists(bdev_params["uri"]):
-      # The uri is a local path.
-      # Creating a file descriptor set and passing it to
-      # QEMU will work around chrooted setups where QEMU
-      # will not be able to directly access the path.
-      fd = os.open(bdev_params["uri"], os.O_RDWR)
+    if access_mode == constants.DISK_KERNELSPACE:
+      fd = os.open(blockdevice["file"]["filename"], os.O_RDWR)
       fdset = self._AddFd(fd)
       os.close(fd)
-      filename = "/dev/fdset/%s" % fdset
+      blockdevice["file"]["filename"] = "/dev/fdset/%s" % fdset
     else:
-      # The uri is not a file.
-      # This can happen if an userspace uri is provided.
-      filename = bdev_params["uri"]
       fdset = None
 
-    bdev_arguments = {
-      "driver": "raw",
-      "node-name": bdev_params["id"],
-      "discard": bdev_params["discard"],
-      "cache": {
-        "direct": bdev_params["cache_direct"],
-        "no-flush": bdev_params["cache_no_flush"]
-      },
-      "file": {
-        "driver": bdev_params["driver_type"],
-        "filename": filename,
-        "aio": bdev_params["aio_mode"],
-      }
-    }
-
     dev_arguments = {
-      "drive": bdev_params["id"],
-      "write-cache": bdev_params["cache_writeback"]
+      "drive": blockdevice["id"],
+      "write-cache": cache_writeback
     }
     # Note that hvinfo that _GenerateDeviceHVInfo() creates
     # should include *only* the driver, id, bus, and
     # addr or channel, scsi-id, and lun keys
     dev_arguments.update(self._filter_hvinfo(disk.hvinfo))
 
-    self.Execute("blockdev-add", bdev_arguments)
+    self.Execute("blockdev-add", blockdevice)
     self.Execute("device_add", dev_arguments)
 
     if fdset is not None:
