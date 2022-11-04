@@ -160,6 +160,10 @@ _HOTPLUGGABLE_DEVICE_TYPES = {
 _PCI_BUS = "pci.0"
 _SCSI_BUS = "scsi.0"
 
+_BLOCKDEV_DRIVER_GLUSTER = "gluster"
+_BLOCKDEV_DRIVER_FILE = "file"
+_BLOCKDEV_DRIVER_HOST_DEVICE = "host_device"
+
 _MIGRATION_CAPS_DELIM = ":"
 
 # in future make dirty_sync_count configurable
@@ -1164,6 +1168,17 @@ class KVMHypervisor(hv_base.BaseHypervisor):
         data.append(info)
     return data
 
+  def _ParseGlusterUrl(self, url):
+    """Parse Gluster URL into its parts
+
+    @type url: string
+    @param url: gluster URL (gluster://host:port/volume/path)
+    @return: tuple (host, port, volume, path)
+
+    """
+    m = re.fullmatch('^gluster:\/\/(?P<host>[a-z0-9-.]+):(?P<port>\d+)/(?P<volume>[^/]+)/(?P<path>.+)$')
+    return m.group('host'), m.group('port'), m.group('volume'), m.group('path')
+
   def _GenerateKVMBlockDevicesOptions(self, up_hvp, kvm_disks,
                                       kvmhelp, devlist):
     """Generate KVM options regarding instance's block devices.
@@ -1202,10 +1217,16 @@ class KVMHypervisor(hv_base.BaseHypervisor):
                                    % driver)
 
     for cfdev, link_name, uri in kvm_disks:
-      if cfdev.dev_type in constants.DTS_FILEBASED:
-        blockdev_driver_type = "file"
+      access_mode = cfdev.params.get(constants.LDP_ACCESS,
+                                     constants.DISK_KERNELSPACE)
+
+      if cfdev.dev_type == constants.DT_GLUSTER and access_mode == \
+              constants.DISK_USERSPACE:
+        blockdev_driver_type = _BLOCKDEV_DRIVER_GLUSTER
+      elif cfdev.dev_type in constants.DTS_FILEBASED:
+        blockdev_driver_type = _BLOCKDEV_DRIVER_FILE
       else:
-        blockdev_driver_type = "host_device"
+        blockdev_driver_type = _BLOCKDEV_DRIVER_HOST_DEVICE
 
       if cfdev.mode != constants.DISK_RDWR:
         raise errors.HypervisorError("Instance has read-only disks which"
@@ -1255,11 +1276,22 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       discard = up_hvp[constants.HV_DISK_DISCARD]
       bdev_opts.append("discard=%s" % discard)
 
-      aio_mode = up_hvp[constants.HV_KVM_DISK_AIO]
-      bdev_opts.append("file.aio=%s" % aio_mode)
+      if access_mode == constants.DISK_KERNELSPACE:
+        aio_mode = up_hvp[constants.HV_KVM_DISK_AIO]
+        bdev_opts.append("file.aio=%s" % aio_mode)
 
       bdev_opts.append("file.driver=%s" % blockdev_driver_type)
-      bdev_opts.append("file.filename=%s" % drive_uri)
+
+      if blockdev_driver_type in [_BLOCKDEV_DRIVER_FILE,
+                                  _BLOCKDEV_DRIVER_HOST_DEVICE]:
+        bdev_opts.append("file.filename=%s" % drive_uri)
+      elif blockdev_driver_type == _BLOCKDEV_DRIVER_GLUSTER:
+        host, port, volume, path = self._ParseGlusterUrl(drive_uri)
+        bdev_opts.append("file.server.0.type=inet")
+        bdev_opts.append("file.server.0.host=%s" % host)
+        bdev_opts.append("file.server.0.port=%s" % port)
+        bdev_opts.append("file.volume=%s" % volume)
+        bdev_opts.append("file.path=%s" % path)
 
       blockdev_str = ",".join(bdev_opts)
 
