@@ -560,7 +560,7 @@ class QmpConnection(MonitorSocket):
       fdset = None
 
     dev_arguments = {
-      "drive": blockdevice["id"],
+      "drive": blockdevice["node-name"],
       "write-cache": cache_writeback
     }
     # Note that hvinfo that _GenerateDeviceHVInfo() creates
