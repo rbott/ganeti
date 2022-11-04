@@ -1168,7 +1168,8 @@ class KVMHypervisor(hv_base.BaseHypervisor):
         data.append(info)
     return data
 
-  def _ParseGlusterUrl(self, url):
+  @staticmethod
+  def _ParseGlusterUrl(url):
     """Parse Gluster URL into its parts
 
     @type url: string
@@ -2356,6 +2357,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       elif blockdev_driver_type == _BLOCKDEV_DRIVER_GLUSTER:
         host, port, volume, path = self._ParseGlusterUrl(target)
         file_driver = {
+          "driver": blockdev_driver_type,
           "server": [
             {
               'type': 'inet',
