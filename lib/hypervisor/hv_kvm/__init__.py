@@ -162,6 +162,7 @@ _SCSI_BUS = "scsi.0"
 
 _BLOCKDEV_DRIVER_FILE = "file"
 _BLOCKDEV_DRIVER_GLUSTER = "gluster"
+_BLOCKDEV_DRIVER_RBD = "rbd"
 _BLOCKDEV_DRIVER_HOST_DEVICE = "host_device"
 
 _MIGRATION_CAPS_DELIM = ":"
@@ -1181,6 +1182,18 @@ class KVMHypervisor(hv_base.BaseHypervisor):
                      '(?P<volume>[^/]+)/(?P<path>.+)$', url)
     return m.group('host'), m.group('port'), m.group('volume'), m.group('path')
 
+  @staticmethod
+  def _ParseRbdUrl(url):
+    """Parse RBD URL into its parts
+
+    @type url: string
+    @param url: rbd URL (rbd:poolname/88af1b42-ac3a-4b51-9052-33b991a36536.rbd.disk0)
+    @return: tuple (pool, image)
+
+    """
+    m = re.fullmatch('^rbd:(?P<pool>\w+)/(?P<image>[a-z0-9-\.]+)$', url)
+    return m.group('pool'), m.group('image')
+
   def _GenerateKVMBlockDevicesOptions(self, up_hvp, kvm_disks,
                                       kvmhelp, devlist):
     """Generate KVM options regarding instance's block devices.
@@ -1225,6 +1238,9 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       if cfdev.dev_type == constants.DT_GLUSTER and access_mode == \
               constants.DISK_USERSPACE:
         blockdev_driver_type = _BLOCKDEV_DRIVER_GLUSTER
+      elif cfdev.dev_type == constants.DT_RBD and access_mode == \
+              constants.DISK_USERSPACE:
+        blockdev_driver_type = _BLOCKDEV_DRIVER_RBD
       elif cfdev.dev_type in constants.DTS_FILEBASED:
         blockdev_driver_type = _BLOCKDEV_DRIVER_FILE
       else:
@@ -1287,6 +1303,10 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       if blockdev_driver_type in [_BLOCKDEV_DRIVER_FILE,
                                   _BLOCKDEV_DRIVER_HOST_DEVICE]:
         bdev_opts.append("file.filename=%s" % drive_uri)
+      elif blockdev_driver_type == _BLOCKDEV_DRIVER_RBD:
+        pool, image = self._ParseRbdUrl(drive_uri)
+        bdev_opts.append("file.pool=%s" % pool)
+        bdev_opts.append("file.image=%s" % image)
       elif blockdev_driver_type == _BLOCKDEV_DRIVER_GLUSTER:
         host, port, volume, path = self._ParseGlusterUrl(drive_uri)
         bdev_opts.append("file.server.0.type=inet")
@@ -2336,6 +2356,9 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       if disk_info.dev_type == constants.DT_GLUSTER and access_mode == \
               constants.DISK_USERSPACE:
         blockdev_driver_type = _BLOCKDEV_DRIVER_GLUSTER
+      elif disk_info.dev_type == constants.DT_RBD and access_mode == \
+              constants.DISK_USERSPACE:
+        blockdev_driver_type = _BLOCKDEV_DRIVER_RBD
       elif disk_info.dev_type in constants.DTS_FILEBASED:
         blockdev_driver_type = _BLOCKDEV_DRIVER_FILE
       else:
@@ -2353,6 +2376,13 @@ class KVMHypervisor(hv_base.BaseHypervisor):
           "driver": blockdev_driver_type,
           "filename": target,
           "aio": up_hvp[constants.HV_KVM_DISK_AIO]
+        }
+      elif blockdev_driver_type == _BLOCKDEV_DRIVER_RBD:
+        pool, image = self._ParseRbdUrl(target)
+        file_driver = {
+          "driver": blockdev_driver_type,
+          "pool": pool,
+          "image": image
         }
       elif blockdev_driver_type == _BLOCKDEV_DRIVER_GLUSTER:
         host, port, volume, path = self._ParseGlusterUrl(target)
