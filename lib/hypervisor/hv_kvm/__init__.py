@@ -1205,11 +1205,13 @@ class KVMHypervisor(hv_base.BaseHypervisor):
   def _FlattenDict(d, parent_key='', sep='.'):
     items = []
     for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(KVMHypervisor._FlattenDict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
+      if isinstance(v, bool):
+        v = "on" if v else "off"
+      new_key = f"{parent_key}{sep}{k}" if parent_key else k
+      if isinstance(v, dict):
+        items.extend(KVMHypervisor._FlattenDict(v, new_key, sep=sep).items())
+      else:
+        items.append((new_key, v))
     return dict(items)
 
   @staticmethod
@@ -1353,7 +1355,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       # HotAddDevice/drive_add_fn which solves a similar problem for hotplugged
       # disks
       if self._AUTO_RO_RE.search(kvmhelp):
-        blockdevice["auto-read-only"] = "off"
+        blockdevice["auto-read-only"] = False
         
       blockdev_str = KVMHypervisor._DictToQemuStringNotation(blockdevice)
 
