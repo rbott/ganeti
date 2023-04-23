@@ -1203,10 +1203,12 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
   @staticmethod
   def _FlattenDict(d, parent_key='', sep='.'):
+    """Helper method to convert nested dicts to flat string representation
+    """
     items = []
     for k, v in d.items():
       if isinstance(v, bool):
-        v = "on" if v else "off"
+        v = _TranslateBoolToOnOff(v)
       new_key = f"{parent_key}{sep}{k}" if parent_key else k
       if isinstance(v, dict):
         items.extend(KVMHypervisor._FlattenDict(v, new_key, sep=sep).items())
@@ -1216,8 +1218,11 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
   @staticmethod
   def _DictToQemuStringNotation(data):
-    """Take an input dictionary and convert it to a flat string representation
-    
+    """Convert dictionary to flat string representation
+
+    This method is used to transform a blockdev QEMU parameter set for use as
+    command line parameters (to QEMUs -blockdev parameter)
+
     @type data: dict
     @param data: data to convert
     @return: string
@@ -1314,9 +1319,6 @@ class KVMHypervisor(hv_base.BaseHypervisor):
                                    % driver)
 
     for cfdev, link_name, uri in kvm_disks:
-      access_mode = cfdev.params.get(constants.LDP_ACCESS,
-                                     constants.DISK_KERNELSPACE)
-
       if cfdev.mode != constants.DISK_RDWR:
         raise errors.HypervisorError("Instance has read-only disks which"
                                      " are not supported by KVM")
