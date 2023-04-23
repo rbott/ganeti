@@ -165,6 +165,9 @@ _BLOCKDEV_DRIVER_GLUSTER = "gluster"
 _BLOCKDEV_DRIVER_RBD = "rbd"
 _BLOCKDEV_DRIVER_HOST_DEVICE = "host_device"
 
+_BLOCKDEV_URI_REGEX_GLUSTER = r'^gluster:\/\/(?P<host>[a-z0-9-.]+):(?P<port>\d+)/(?P<volume>[^/]+)/(?P<path>.+)$'
+_BLOCKDEV_URI_REGEX_RBD = r'^rbd:(?P<pool>\w+)/(?P<image>[a-z0-9-\.]+)$'
+
 _MIGRATION_CAPS_DELIM = ":"
 
 # in future make dirty_sync_count configurable
@@ -1170,6 +1173,56 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     return data
 
   @staticmethod
+  def _ParseStorageUrlToBlockdevParam(url):
+    """Parse a storage url into qemu blockdev params
+    
+    @type url: string
+    @param url: storage-describing URL
+    @return: dict
+    """
+    if (match := re.match(_BLOCKDEV_URI_REGEX_GLUSTER, url)) is not None:
+      return {
+          "driver": "gluster",
+          "server": [
+            {
+              'type': 'inet',
+              'host': match.group('host'),
+              'port': match.group('port'),
+            }
+          ],
+          "volume": match.group('volume'),
+          "path": match.group('path')
+        }
+    elif (match := re.match(_BLOCKDEV_URI_REGEX_RBD, url)) is not None:
+      return {
+          "driver": "rbd",
+          "pool": match.group('pool'),
+          "image": match.group('image')
+        }
+    raise errors.HypervisorError("Unsupported storage URI scheme: %s" % (url))
+
+  @staticmethod
+  def _FlattenDict(d, parent_key='', sep='.'):
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(KVMHypervisor._FlattenDict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+  @staticmethod
+  def _DictToQemuStringNotation(data):
+    """Take an input dictionary and convert it to a flat string representation
+    
+    @type data: dict
+    @param data: data to convert
+    @return: string
+    """
+    return ','.join([f'{key}={value}' for key, value in KVMHypervisor._FlattenDict(data).items()])
+
+  @staticmethod
   def _ParseGlusterUrl(url):
     """Parse Gluster URL into its parts
 
@@ -1193,6 +1246,33 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     """
     m = re.fullmatch('^rbd:(?P<pool>\w+)/(?P<image>[a-z0-9-\.]+)$', url)
     return m.group('pool'), m.group('image')
+
+  @staticmethod
+  def _GenerateKVMBlockDevice(target, disk_info, hvp, kvm_devid):
+    _, direct, no_flush = _GetCacheSettings(hvp[constants.HV_DISK_CACHE],
+                                                    disk_info.dev_type)
+    access_mode = disk_info.params.get(constants.LDP_ACCESS, constants.DISK_KERNELSPACE)
+    
+    if access_mode == constants.DISK_USERSPACE:
+      driver = KVMHypervisor._ParseStorageUrlToBlockdevParam(target)
+    else:
+      driver = {
+        "driver": "file" if disk_info.dev_type in constants.DTS_FILEBASED
+          else "host_device",
+        "filename": target,
+        "aio": hvp[constants.HV_KVM_DISK_AIO]
+      }
+    
+    return {
+      "driver": "raw",
+      "node-name": kvm_devid,
+      "discard": hvp[constants.HV_DISK_DISCARD],
+      "cache": {
+        "direct": direct,
+        "no-flush": no_flush
+      },
+      "file": driver
+    }
 
   def _GenerateKVMBlockDevicesOptions(self, up_hvp, kvm_disks,
                                       kvmhelp, devlist):
@@ -1235,17 +1315,6 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       access_mode = cfdev.params.get(constants.LDP_ACCESS,
                                      constants.DISK_KERNELSPACE)
 
-      if cfdev.dev_type == constants.DT_GLUSTER and access_mode == \
-              constants.DISK_USERSPACE:
-        blockdev_driver_type = _BLOCKDEV_DRIVER_GLUSTER
-      elif cfdev.dev_type == constants.DT_RBD and access_mode == \
-              constants.DISK_USERSPACE:
-        blockdev_driver_type = _BLOCKDEV_DRIVER_RBD
-      elif cfdev.dev_type in constants.DTS_FILEBASED:
-        blockdev_driver_type = _BLOCKDEV_DRIVER_FILE
-      else:
-        blockdev_driver_type = _BLOCKDEV_DRIVER_HOST_DEVICE
-
       if cfdev.mode != constants.DISK_RDWR:
         raise errors.HypervisorError("Instance has read-only disks which"
                                      " are not supported by KVM")
@@ -1260,6 +1329,8 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
       writeback, direct, no_flush = _GetCacheSettings(
         up_hvp[constants.HV_DISK_CACHE], cfdev.dev_type)
+
+      blockdevice = self._GenerateKVMBlockDevice(drive_uri, cfdev, up_hvp, kvm_devid)
 
       if disk_type == constants.HT_DISK_IDE:
         dev_opts.extend(["-device", "ide-hd,drive=%s,write-cache=%s" %
@@ -1276,46 +1347,15 @@ class KVMHypervisor(hv_base.BaseHypervisor):
                                                    writeback))
         dev_opts.extend(["-device", dev_val])
 
-      bdev_opts = [
-        "driver=raw",
-        "node-name=%s" % kvm_devid,
-      ]
       # QEMU 4.0 introduced dynamic auto-read-only for file-backed drives. This
       # is unhandled in Ganeti and breaks live migration with
       # security_model=user|pool, disable it here. See also
       # HotAddDevice/drive_add_fn which solves a similar problem for hotplugged
       # disks
       if self._AUTO_RO_RE.search(kvmhelp):
-        bdev_opts.append("auto-read-only=off")
-
-      bdev_opts.append("cache.direct=%s" % _TranslateBoolToOnOff(direct))
-      bdev_opts.append("cache.no-flush=%s" % _TranslateBoolToOnOff(no_flush))
-
-      discard = up_hvp[constants.HV_DISK_DISCARD]
-      bdev_opts.append("discard=%s" % discard)
-
-      if access_mode == constants.DISK_KERNELSPACE:
-        aio_mode = up_hvp[constants.HV_KVM_DISK_AIO]
-        bdev_opts.append("file.aio=%s" % aio_mode)
-
-      bdev_opts.append("file.driver=%s" % blockdev_driver_type)
-
-      if blockdev_driver_type in [_BLOCKDEV_DRIVER_FILE,
-                                  _BLOCKDEV_DRIVER_HOST_DEVICE]:
-        bdev_opts.append("file.filename=%s" % drive_uri)
-      elif blockdev_driver_type == _BLOCKDEV_DRIVER_RBD:
-        pool, image = self._ParseRbdUrl(drive_uri)
-        bdev_opts.append("file.pool=%s" % pool)
-        bdev_opts.append("file.image=%s" % image)
-      elif blockdev_driver_type == _BLOCKDEV_DRIVER_GLUSTER:
-        host, port, volume, path = self._ParseGlusterUrl(drive_uri)
-        bdev_opts.append("file.server.0.type=inet")
-        bdev_opts.append("file.server.0.host=%s" % host)
-        bdev_opts.append("file.server.0.port=%s" % port)
-        bdev_opts.append("file.volume=%s" % volume)
-        bdev_opts.append("file.path=%s" % path)
-
-      blockdev_str = ",".join(bdev_opts)
+        blockdevice["auto-read-only"] = "off"
+        
+      blockdev_str = KVMHypervisor._DictToQemuStringNotation(blockdevice)
 
       dev_opts.extend(["-blockdev", blockdev_str])
 
@@ -2343,72 +2383,16 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
     new_runtime_entry = _RUNTIME_ENTRY[dev_type](device, extra)
     if dev_type == constants.HOTPLUG_TARGET_DISK:
-      bdev_params = {
-        "id": kvm_devid,
-        "uri": _GetDriveURI(device, extra[0], extra[1]),
-        "discard": up_hvp[constants.HV_DISK_DISCARD],
-      }
-
       disk_info = new_runtime_entry[0]
       access_mode = disk_info.params.get(constants.LDP_ACCESS,
                                          constants.DISK_KERNELSPACE)
-
-      if disk_info.dev_type == constants.DT_GLUSTER and access_mode == \
-              constants.DISK_USERSPACE:
-        blockdev_driver_type = _BLOCKDEV_DRIVER_GLUSTER
-      elif disk_info.dev_type == constants.DT_RBD and access_mode == \
-              constants.DISK_USERSPACE:
-        blockdev_driver_type = _BLOCKDEV_DRIVER_RBD
-      elif disk_info.dev_type in constants.DTS_FILEBASED:
-        blockdev_driver_type = _BLOCKDEV_DRIVER_FILE
-      else:
-        blockdev_driver_type = _BLOCKDEV_DRIVER_HOST_DEVICE
-
+      
       writeback, direct, no_flush = _GetCacheSettings(
         up_hvp[constants.HV_DISK_CACHE], disk_info.dev_type)
 
-      file_driver = {}
       target = _GetDriveURI(device, extra[0], extra[1])
-
-      if blockdev_driver_type in [_BLOCKDEV_DRIVER_FILE,
-                                  _BLOCKDEV_DRIVER_HOST_DEVICE]:
-        file_driver = {
-          "driver": blockdev_driver_type,
-          "filename": target,
-          "aio": up_hvp[constants.HV_KVM_DISK_AIO]
-        }
-      elif blockdev_driver_type == _BLOCKDEV_DRIVER_RBD:
-        pool, image = self._ParseRbdUrl(target)
-        file_driver = {
-          "driver": blockdev_driver_type,
-          "pool": pool,
-          "image": image
-        }
-      elif blockdev_driver_type == _BLOCKDEV_DRIVER_GLUSTER:
-        host, port, volume, path = self._ParseGlusterUrl(target)
-        file_driver = {
-          "driver": blockdev_driver_type,
-          "server": [
-            {
-              'type': 'inet',
-              'host': host,
-              'port': port
-            }
-          ],
-          "volume": volume,
-          "path": path
-        }
-
-      blockdevice = {
-        "driver": "raw",
-        "node-name": kvm_devid,
-        "discard": up_hvp[constants.HV_DISK_DISCARD],
-        "cache": {
-          "direct": direct,
-          "no-flush": no_flush
-        },
-        "file": file_driver
-      }
+      
+      blockdevice = self._GenerateKVMBlockDevice(target, disk_info, up_hvp, kvm_devid)
 
       self.qmp.HotAddDisk(device, access_mode, writeback, blockdevice)
     elif dev_type == constants.HOTPLUG_TARGET_NIC:
