@@ -972,8 +972,9 @@ class TestDictToQemuStringNotation(unittest.TestCase):
           },
           'auto-read-only': False
         },
-        "result": "driver=raw,node-name=disk-3edc32a2-8127-4b9d,discard=ignore,"
-                  "cache.direct=on,cache.no-flush=off,file.driver=rbd,file.pool=ganeti,"
+        "result": "driver=raw,node-name=disk-3edc32a2-8127-4b9d,"
+                  "discard=ignore,cache.direct=on,cache.no-flush=off,"
+                  "file.driver=rbd,file.pool=ganeti,"
                   "file.image=32eb97b3-ec20-401d-b48c-a1f24c0385a2.rbd.disk0,"
                   "auto-read-only=off"
       },
@@ -993,14 +994,17 @@ class TestDictToQemuStringNotation(unittest.TestCase):
             },
             'auto-read-only': False
           },
-          "result": "driver=raw,node-name=disk-c44790ad-e9e2-46a3,discard=ignore,"
-                    "cache.direct=on,cache.no-flush=off,file.driver=host_device,"
-                    "file.filename=/path/to/disk,file.aio=native,auto-read-only=off"
+          "result": "driver=raw,node-name=disk-c44790ad-e9e2-46a3,"
+                    "discard=ignore,cache.direct=on,cache.no-flush=off,"
+                    "file.driver=host_device,"
+                    "file.filename=/path/to/disk,file.aio=native,"
+                    "auto-read-only=off"
       }
     ]
 
     for test in tests:
-      self.assertEqual(test["result"], hv_kvm._DictToQemuStringNotation(test["blockdev"]))
+      self.assertEqual(test["result"],
+                       hv_kvm._DictToQemuStringNotation(test["blockdev"]))
 
 
 class TestParseStorageUriToBlockdevParam(unittest.TestCase):
@@ -1040,7 +1044,8 @@ class TestParseStorageUriToBlockdevParam(unittest.TestCase):
   def testBadURI(self):
     uri = "gopher://storage/file"
 
-    self.assertRaises(errors.HypervisorError, hv_kvm._ParseStorageUriToBlockdevParam, uri)
+    self.assertRaises(errors.HypervisorError,
+                      hv_kvm._ParseStorageUriToBlockdevParam, uri)
 
 
 class PostfixMatcher(object):

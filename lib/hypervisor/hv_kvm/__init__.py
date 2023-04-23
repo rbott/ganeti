@@ -160,8 +160,11 @@ _HOTPLUGGABLE_DEVICE_TYPES = {
 _PCI_BUS = "pci.0"
 _SCSI_BUS = "scsi.0"
 
-_BLOCKDEV_URI_REGEX_GLUSTER = r'^gluster:\/\/(?P<host>[a-z0-9-.]+):(?P<port>\d+)/(?P<volume>[^/]+)/(?P<path>.+)$'
-_BLOCKDEV_URI_REGEX_RBD = r'^rbd:(?P<pool>\w+)/(?P<image>[a-z0-9-\.]+)$'
+_BLOCKDEV_URI_REGEX_GLUSTER = (
+  r"^gluster:\/\/(?P<host>[a-z0-9-.]+):"
+  r"(?P<port>\d+)/(?P<volume>[^/]+)/(?P<path>.+)$"
+)
+_BLOCKDEV_URI_REGEX_RBD = r"^rbd:(?P<pool>\w+)/(?P<image>[a-z0-9-\.]+)$"
 
 _MIGRATION_CAPS_DELIM = ":"
 
@@ -502,7 +505,7 @@ def _TranslateBoolToOnOff(value):
 
 def _ParseStorageUriToBlockdevParam(uri):
   """Parse a storage uri into qemu blockdev params
-  
+
   @type uri: string
   @param uri: storage-describing URI
   @return: dict
@@ -554,8 +557,10 @@ def _DictToQemuStringNotation(data):
   @param data: data to convert
   @return: string
   """
-  logging.debug("Converting the following data structure to flat string: %s" % (data))
-  flat_str = ','.join(["%s=%s" % (key, value) for key, value in _FlattenDict(data).items()])
+  logging.debug("Converting the following data structure "
+                "to flat string: %s" % (data))
+  flat_str = ','.join(["%s=%s" % (key, value) for key, value in
+                       _FlattenDict(data).items()])
   logging.debug("Result: %s" % flat_str)
   return flat_str
 
@@ -1231,8 +1236,9 @@ class KVMHypervisor(hv_base.BaseHypervisor):
   def _GenerateKVMBlockDevice(target, disk_info, hvp, kvm_devid):
     _, direct, no_flush = _GetCacheSettings(hvp[constants.HV_DISK_CACHE],
                                                     disk_info.dev_type)
-    access_mode = disk_info.params.get(constants.LDP_ACCESS, constants.DISK_KERNELSPACE)
-    
+    access_mode = disk_info.params.get(constants.LDP_ACCESS,
+                                       constants.DISK_KERNELSPACE)
+
     if access_mode == constants.DISK_USERSPACE:
       driver = _ParseStorageUriToBlockdevParam(target)
     else:
@@ -1242,7 +1248,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
         "filename": target,
         "aio": hvp[constants.HV_KVM_DISK_AIO]
       }
-    
+
     return {
       "driver": "raw",
       "node-name": kvm_devid,
@@ -1307,7 +1313,8 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       writeback, direct, no_flush = _GetCacheSettings(
         up_hvp[constants.HV_DISK_CACHE], cfdev.dev_type)
 
-      blockdevice = self._GenerateKVMBlockDevice(drive_uri, cfdev, up_hvp, kvm_devid)
+      blockdevice = self._GenerateKVMBlockDevice(drive_uri, cfdev, up_hvp,
+                                                 kvm_devid)
 
       if disk_type == constants.HT_DISK_IDE:
         dev_opts.extend(["-device", "ide-hd,drive=%s,write-cache=%s" %
@@ -1331,7 +1338,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       # disks
       if self._AUTO_RO_RE.search(kvmhelp):
         blockdevice["auto-read-only"] = False
-        
+
       blockdev_str = _DictToQemuStringNotation(blockdevice)
 
       dev_opts.extend(["-blockdev", blockdev_str])
@@ -2363,13 +2370,14 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       disk_info = new_runtime_entry[0]
       access_mode = disk_info.params.get(constants.LDP_ACCESS,
                                          constants.DISK_KERNELSPACE)
-      
+
       writeback, direct, no_flush = _GetCacheSettings(
         up_hvp[constants.HV_DISK_CACHE], disk_info.dev_type)
 
       target = _GetDriveURI(device, extra[0], extra[1])
-      
-      blockdevice = self._GenerateKVMBlockDevice(target, disk_info, up_hvp, kvm_devid)
+
+      blockdevice = self._GenerateKVMBlockDevice(target, disk_info, up_hvp,
+                                                 kvm_devid)
 
       self.qmp.HotAddDisk(device, access_mode, writeback, blockdevice)
     elif dev_type == constants.HOTPLUG_TARGET_NIC:
