@@ -160,11 +160,6 @@ _HOTPLUGGABLE_DEVICE_TYPES = {
 _PCI_BUS = "pci.0"
 _SCSI_BUS = "scsi.0"
 
-_BLOCKDEV_DRIVER_FILE = "file"
-_BLOCKDEV_DRIVER_GLUSTER = "gluster"
-_BLOCKDEV_DRIVER_RBD = "rbd"
-_BLOCKDEV_DRIVER_HOST_DEVICE = "host_device"
-
 _BLOCKDEV_URI_REGEX_GLUSTER = r'^gluster:\/\/(?P<host>[a-z0-9-.]+):(?P<port>\d+)/(?P<volume>[^/]+)/(?P<path>.+)$'
 _BLOCKDEV_URI_REGEX_RBD = r'^rbd:(?P<pool>\w+)/(?P<image>[a-z0-9-\.]+)$'
 
@@ -505,33 +500,33 @@ def _TranslateBoolToOnOff(value):
     return 'off'
 
 
-def _ParseStorageUrlToBlockdevParam(url):
-  """Parse a storage url into qemu blockdev params
+def _ParseStorageUriToBlockdevParam(uri):
+  """Parse a storage uri into qemu blockdev params
   
-  @type url: string
-  @param url: storage-describing URL
+  @type uri: string
+  @param uri: storage-describing URI
   @return: dict
   """
-  if (match := re.match(_BLOCKDEV_URI_REGEX_GLUSTER, url)) is not None:
+  if (match := re.match(_BLOCKDEV_URI_REGEX_GLUSTER, uri)) is not None:
     return {
         "driver": "gluster",
         "server": [
           {
             'type': 'inet',
-            'host': match.group('host'),
-            'port': match.group('port'),
+            'host': match.group("host"),
+            'port': match.group("port"),
           }
         ],
-        "volume": match.group('volume'),
-        "path": match.group('path')
+        "volume": match.group("volume"),
+        "path": match.group("path")
       }
-  elif (match := re.match(_BLOCKDEV_URI_REGEX_RBD, url)) is not None:
+  elif (match := re.match(_BLOCKDEV_URI_REGEX_RBD, uri)) is not None:
     return {
         "driver": "rbd",
-        "pool": match.group('pool'),
-        "image": match.group('image')
+        "pool": match.group("pool"),
+        "image": match.group("image")
       }
-  raise errors.HypervisorError("Unsupported storage URI scheme: %s" % (url))
+  raise errors.HypervisorError("Unsupported storage URI scheme: %s" % (uri))
 
 
 def _FlattenDict(d, parent_key='', sep='.'):
@@ -1239,7 +1234,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     access_mode = disk_info.params.get(constants.LDP_ACCESS, constants.DISK_KERNELSPACE)
     
     if access_mode == constants.DISK_USERSPACE:
-      driver = _ParseStorageUrlToBlockdevParam(target)
+      driver = _ParseStorageUriToBlockdevParam(target)
     else:
       driver = {
         "driver": "file" if disk_info.dev_type in constants.DTS_FILEBASED

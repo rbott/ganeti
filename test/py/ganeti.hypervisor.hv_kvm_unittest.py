@@ -953,6 +953,96 @@ class TestGetRuntimeInfo(unittest.TestCase):
     self.assertTrue(devinfo.hvinfo["addr"] == "0xa")
 
 
+class TestDictToQemuStringNotation(unittest.TestCase):
+  def test(self):
+    tests = [
+      {
+        "blockdev": {
+          'driver': 'raw',
+          'node-name': 'disk-3edc32a2-8127-4b9d',
+          'discard': 'ignore',
+          'cache': {
+            'direct': True,
+            'no-flush': False
+          },
+          'file': {
+            'driver': 'rbd',
+            'pool': 'ganeti',
+            'image': '32eb97b3-ec20-401d-b48c-a1f24c0385a2.rbd.disk0'
+          },
+          'auto-read-only': False
+        },
+        "result": "driver=raw,node-name=disk-3edc32a2-8127-4b9d,discard=ignore,"
+                  "cache.direct=on,cache.no-flush=off,file.driver=rbd,file.pool=ganeti,"
+                  "file.image=32eb97b3-ec20-401d-b48c-a1f24c0385a2.rbd.disk0,"
+                  "auto-read-only=off"
+      },
+      {
+          "blockdev": {
+            'driver': 'raw',
+            'node-name': 'disk-c44790ad-e9e2-46a3',
+            'discard': 'ignore',
+            'cache': {
+              'direct': True,
+              'no-flush': False
+            },
+            'file': {
+              'driver': 'host_device',
+              'filename': '/path/to/disk',
+              'aio': 'native'
+            },
+            'auto-read-only': False
+          },
+          "result": "driver=raw,node-name=disk-c44790ad-e9e2-46a3,discard=ignore,"
+                    "cache.direct=on,cache.no-flush=off,file.driver=host_device,"
+                    "file.filename=/path/to/disk,file.aio=native,auto-read-only=off"
+      }
+    ]
+
+    for test in tests:
+      self.assertEqual(test["result"], hv_kvm._DictToQemuStringNotation(test["blockdev"]))
+
+
+class TestParseStorageUriToBlockdevParam(unittest.TestCase):
+  def testRbd(self):
+    uri = "rbd:cephpool/image-1234-xyz"
+
+    expected_data = {
+        "driver": "rbd",
+        "pool": "cephpool",
+        "image": "image-1234-xyz"
+    }
+
+    blockdev_driver = hv_kvm._ParseStorageUriToBlockdevParam(uri)
+
+    self.assertDictEqual(expected_data, blockdev_driver)
+
+  def testGluster(self):
+    uri = "gluster://server:1234/gluster-volume/path"
+
+    expected_data = {
+      "driver": "gluster",
+      "server": [
+        {
+          "type": "inet",
+          "host": "server",
+          "port": "1234",
+        }
+      ],
+      "volume": "gluster-volume",
+      "path": "path"
+    }
+
+    blockdev_driver = hv_kvm._ParseStorageUriToBlockdevParam(uri)
+
+    self.assertDictEqual(expected_data, blockdev_driver)
+
+  def testBadURI(self):
+    uri = "gopher://storage/file"
+
+    self.assertRaises(errors.HypervisorError, hv_kvm._ParseStorageUriToBlockdevParam, uri)
+
+
 class PostfixMatcher(object):
   def __init__(self, string):
     self.string = string
