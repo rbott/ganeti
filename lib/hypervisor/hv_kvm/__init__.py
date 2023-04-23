@@ -505,6 +505,63 @@ def _TranslateBoolToOnOff(value):
     return 'off'
 
 
+def _ParseStorageUrlToBlockdevParam(url):
+  """Parse a storage url into qemu blockdev params
+  
+  @type url: string
+  @param url: storage-describing URL
+  @return: dict
+  """
+  if (match := re.match(_BLOCKDEV_URI_REGEX_GLUSTER, url)) is not None:
+    return {
+        "driver": "gluster",
+        "server": [
+          {
+            'type': 'inet',
+            'host': match.group('host'),
+            'port': match.group('port'),
+          }
+        ],
+        "volume": match.group('volume'),
+        "path": match.group('path')
+      }
+  elif (match := re.match(_BLOCKDEV_URI_REGEX_RBD, url)) is not None:
+    return {
+        "driver": "rbd",
+        "pool": match.group('pool'),
+        "image": match.group('image')
+      }
+  raise errors.HypervisorError("Unsupported storage URI scheme: %s" % (url))
+
+
+def _FlattenDict(d, parent_key='', sep='.'):
+  """Helper method to convert nested dicts to flat string representation
+  """
+  items = []
+  for k, v in d.items():
+    if isinstance(v, bool):
+      v = _TranslateBoolToOnOff(v)
+    new_key = f"{parent_key}{sep}{k}" if parent_key else k
+    if isinstance(v, dict):
+      items.extend(_FlattenDict(v, new_key, sep=sep).items())
+    else:
+      items.append((new_key, v))
+  return dict(items)
+
+
+def _DictToQemuStringNotation(data):
+  """Convert dictionary to flat string representation
+
+  This function is used to transform a blockdev QEMU parameter set for use as
+  command line parameters (to QEMUs -blockdev parameter)
+
+  @type data: dict
+  @param data: data to convert
+  @return: string
+  """
+  return ','.join(["%s=%s" % (key, value) for key, value in _FlattenDict(data).items()])
+
+
 class HeadRequest(urllib.request.Request):
   def get_method(self):
     return "HEAD"
@@ -1173,95 +1230,13 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     return data
 
   @staticmethod
-  def _ParseStorageUrlToBlockdevParam(url):
-    """Parse a storage url into qemu blockdev params
-    
-    @type url: string
-    @param url: storage-describing URL
-    @return: dict
-    """
-    if (match := re.match(_BLOCKDEV_URI_REGEX_GLUSTER, url)) is not None:
-      return {
-          "driver": "gluster",
-          "server": [
-            {
-              'type': 'inet',
-              'host': match.group('host'),
-              'port': match.group('port'),
-            }
-          ],
-          "volume": match.group('volume'),
-          "path": match.group('path')
-        }
-    elif (match := re.match(_BLOCKDEV_URI_REGEX_RBD, url)) is not None:
-      return {
-          "driver": "rbd",
-          "pool": match.group('pool'),
-          "image": match.group('image')
-        }
-    raise errors.HypervisorError("Unsupported storage URI scheme: %s" % (url))
-
-  @staticmethod
-  def _FlattenDict(d, parent_key='', sep='.'):
-    """Helper method to convert nested dicts to flat string representation
-    """
-    items = []
-    for k, v in d.items():
-      if isinstance(v, bool):
-        v = _TranslateBoolToOnOff(v)
-      new_key = f"{parent_key}{sep}{k}" if parent_key else k
-      if isinstance(v, dict):
-        items.extend(KVMHypervisor._FlattenDict(v, new_key, sep=sep).items())
-      else:
-        items.append((new_key, v))
-    return dict(items)
-
-  @staticmethod
-  def _DictToQemuStringNotation(data):
-    """Convert dictionary to flat string representation
-
-    This method is used to transform a blockdev QEMU parameter set for use as
-    command line parameters (to QEMUs -blockdev parameter)
-
-    @type data: dict
-    @param data: data to convert
-    @return: string
-    """
-    return ','.join([f'{key}={value}' for key, value in KVMHypervisor._FlattenDict(data).items()])
-
-  @staticmethod
-  def _ParseGlusterUrl(url):
-    """Parse Gluster URL into its parts
-
-    @type url: string
-    @param url: gluster URL (gluster://host:port/volume/path)
-    @return: tuple (host, port, volume, path)
-
-    """
-    m = re.fullmatch('^gluster:\/\/(?P<host>[a-z0-9-.]+):(?P<port>\d+)/'
-                     '(?P<volume>[^/]+)/(?P<path>.+)$', url)
-    return m.group('host'), m.group('port'), m.group('volume'), m.group('path')
-
-  @staticmethod
-  def _ParseRbdUrl(url):
-    """Parse RBD URL into its parts
-
-    @type url: string
-    @param url: rbd URL (e.g. rbd:poolname/{UUID}.rbd.disk0)
-    @return: tuple (pool, image)
-
-    """
-    m = re.fullmatch('^rbd:(?P<pool>\w+)/(?P<image>[a-z0-9-\.]+)$', url)
-    return m.group('pool'), m.group('image')
-
-  @staticmethod
   def _GenerateKVMBlockDevice(target, disk_info, hvp, kvm_devid):
     _, direct, no_flush = _GetCacheSettings(hvp[constants.HV_DISK_CACHE],
                                                     disk_info.dev_type)
     access_mode = disk_info.params.get(constants.LDP_ACCESS, constants.DISK_KERNELSPACE)
     
     if access_mode == constants.DISK_USERSPACE:
-      driver = KVMHypervisor._ParseStorageUrlToBlockdevParam(target)
+      driver = _ParseStorageUrlToBlockdevParam(target)
     else:
       driver = {
         "driver": "file" if disk_info.dev_type in constants.DTS_FILEBASED
@@ -1359,7 +1334,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       if self._AUTO_RO_RE.search(kvmhelp):
         blockdevice["auto-read-only"] = False
         
-      blockdev_str = KVMHypervisor._DictToQemuStringNotation(blockdevice)
+      blockdev_str = _DictToQemuStringNotation(blockdevice)
 
       dev_opts.extend(["-blockdev", blockdev_str])
 
