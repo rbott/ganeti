@@ -559,7 +559,10 @@ def _DictToQemuStringNotation(data):
   @param data: data to convert
   @return: string
   """
-  return ','.join(["%s=%s" % (key, value) for key, value in _FlattenDict(data).items()])
+  logging.debug("Converting the following data structure to flat string: %s" % (data))
+  flat_str = ','.join(["%s=%s" % (key, value) for key, value in _FlattenDict(data).items()])
+  logging.debug("Result: %s" % flat_str)
+  return flat_str
 
 
 class HeadRequest(urllib.request.Request):
