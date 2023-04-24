@@ -444,6 +444,11 @@ def _UpgradeSerializedRuntime(serialized_runtime):
 
       # Replace the original vnc argument with the new ones
       kvm_cmd[idx:idx+2] = tls_obj_cmd + vnc_cmd
+    
+    # with 3.1 the 'default' value for disk_discard has been dropped
+    # and replaced by 'ignore'
+    if hvparams["disk_discard"] not in constants.HT_VALID_DISCARD_TYPES:
+      hvparams["disk_discard"] == constants.HT_DISCARD_IGNORE
 
   return kvm_cmd, serialized_nics, hvparams, serialized_disks
 
