@@ -258,6 +258,21 @@ class R_version(baserlib.ResourceBase):
   This resource should be used to determine the remote API version and
   to adapt clients accordingly.
 
+  OpenAPI BEGIN
+  /version:
+    get:
+      summary: "Return remote API (RAPI) version"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - RAPI
+  OpenAPI END
+
   """
   @staticmethod
   def GET():
@@ -269,6 +284,24 @@ class R_version(baserlib.ResourceBase):
 
 class R_2_info(baserlib.OpcodeResource):
   """/2/info resource.
+
+  OpenAPI BEGIN
+  /2/info:
+    get:
+      summary: "Cluster information resource"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  not_yet_documented:
+                    type: string
+      tags:
+        - Cluster
+  OpenAPI END
 
   """
   GET_OPCODE = opcodes.OpClusterQuery
@@ -288,6 +321,23 @@ class R_2_info(baserlib.OpcodeResource):
 class R_2_features(baserlib.ResourceBase):
   """/2/features resource.
 
+  OpenAPI BEGIN
+  /2/features:
+    get:
+      summary: "Returns list of optional RAPI features implemented"
+      responses:
+        '200':
+          description: OK
+          content:
+            application_json:
+              schema:
+                type: array
+                items:
+                  type: string
+      tags:
+        - RAPI
+  OpenAPI END
+
   """
   @staticmethod
   def GET():
@@ -299,6 +349,25 @@ class R_2_features(baserlib.ResourceBase):
 
 class R_2_os(baserlib.OpcodeResource):
   """/2/os resource.
+
+  OpenAPI BEGIN
+  /2/os:
+    get:
+      summary: "Returns list of OSes known to Ganeti. Rather resource-intensive, use carefully."
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '500':
+          description: "Error occured during OS name retrieval"
+      tags:
+        - Operating Systems
+  OpenAPI END
 
   """
   GET_OPCODE = opcodes.OpOsDiagnose
@@ -333,13 +402,42 @@ class R_2_os(baserlib.OpcodeResource):
 class R_2_redist_config(baserlib.OpcodeResource):
   """/2/redistribute-config resource.
 
+  OpenAPI BEGIN
+  /2/redistribute-config:
+    put:
+      summary: "Redistribute cluster configuration"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Cluster
+  OpenAPI END
   """
+
   PUT_OPCODE = opcodes.OpClusterRedistConf
 
 
 class R_2_cluster_modify(baserlib.OpcodeResource):
   """/2/modify resource.
 
+  OpenAPI BEGIN
+  /2/modify:
+    put:
+      summary: "Modify cluster configuration"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Cluster
+  OpenAPI END
   """
   PUT_OPCODE = opcodes.OpClusterSetParams
   PUT_FORBIDDEN = [
@@ -382,6 +480,68 @@ def checkFilterParameters(data):
 class R_2_filters(baserlib.ResourceBase):
   """/2/filters resource.
 
+  OpenAPI BEGIN
+  /2/filters:
+    get:
+      summary: "List filter rules"
+      parameters:
+        - in: query
+          name: bulk
+          description: "Bulk output"
+          schema:
+            type: integer
+            enum: [0, 1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        uri:
+                          type: string
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        uuid:
+                          type: string
+                          format: uuid
+                        watermark:
+                          type: integer
+                        reason_trail:
+                          type: array
+                          items:
+                            type: string
+                        priority:
+                          type: integer
+                        action:
+                          type: string
+                        predicates:
+                          type: array
+                          items:
+                            type: string
+      tags:
+        - RAPI
+    post:
+      summary: "Add a filter rule"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+                format: uuid
+      tags:
+        - RAPI
+  OpenAPI END
   """
 
   def GET(self):
@@ -417,6 +577,81 @@ class R_2_filters(baserlib.ResourceBase):
 class R_2_filters_uuid(baserlib.ResourceBase):
   """/2/filters/[filter_uuid] resource.
 
+  OpenAPI BEGIN
+  /2/filters/{filter_uuid}:
+    get:
+      summary: "Return a filter rule"
+      parameters:
+        - in: path
+          name: filter_uuid
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: "Filter UUID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uuid:
+                    type: string
+                    format: uuid
+                  watermark:
+                    type: integer
+                  reason_trail:
+                    type: array
+                    items:
+                      type: string
+                  priority:
+                    type: integer
+                  action:
+                    type: string
+                  predicates:
+                    type: array
+                    items:
+                      type: string
+      tags:
+        - RAPI
+    put:
+      summary: "Replace an existing filter rule"
+      parameters:
+        - in: path
+          name: filter_uuid
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: "Filter UUID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+                format: uuid
+      tags:
+        - RAPI
+    delete:
+      summary: "Delete an existing filter rule"
+      parameters:
+        - in: path
+          name: filter_uuid
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: "Filter UUID"
+      responses:
+        '200':
+          description: OK
+      tags:
+        - RAPI
+  OpenAPI END
   """
   def GET(self):
     """Returns a filter rule.
@@ -468,6 +703,64 @@ class R_2_filters_uuid(baserlib.ResourceBase):
 class R_2_jobs(baserlib.ResourceBase):
   """/2/jobs resource.
 
+  TODO: the following is incomplete
+  OpenAPI BEGIN
+  /2/jobs:
+    get:
+      summary: "List Ganeti jobs"
+      parameters:
+        - in: query
+          name: bulk
+          description: "Bulk output"
+          schema:
+            type: integer
+            enum: [0, 1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        uri:
+                          type: string
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        start_ts:
+                          type: array
+                          items:
+                            type: integer
+                        end_ts:
+                          type: array
+                          items:
+                            type: integer
+                        opstatus:
+                          type: array
+                          items:
+                            type: string
+                        status:
+                          type: string
+                          enum: [running, success, waiting, queued, error]
+                        summary:
+                          type: array
+                          items:
+                            type: string
+                        ops:
+                          type: object
+                          additionalProperties: {}
+      tags:
+        - Jobs
+  OpenAPI END
   """
   def GET(self):
     """Returns a dictionary of jobs.
@@ -488,6 +781,67 @@ class R_2_jobs(baserlib.ResourceBase):
 
 class R_2_jobs_id(baserlib.ResourceBase):
   """/2/jobs/[job_id] resource.
+
+  OpenAPI BEGIN
+  /2/jobs/{job_id}:
+    get:
+      summary: "Retrieve specific Ganeti Job"
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema:
+            type: integer
+          description: "Ganeti Job ID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  start_ts:
+                    type: array
+                    items:
+                      type: integer
+                  end_ts:
+                    type: array
+                    items:
+                      type: integer
+                  opstatus:
+                    type: array
+                    items:
+                      type: string
+                  status:
+                    type: string
+                    enum: [running, success, waiting, queued, error]
+                  summary:
+                    type: array
+                    items:
+                      type: string
+                  ops:
+                    type: object
+                    additionalProperties: {}
+      tags:
+        - Jobs
+    delete:
+      summary: "Remove a Ganeti Job from queue"
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema:
+            type: integer
+          description: "Ganeti Job ID"
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Jobs
+  OpenAPI END
 
   """
   def GET(self):
@@ -520,6 +874,62 @@ class R_2_jobs_id(baserlib.ResourceBase):
 
 class R_2_jobs_id_wait(baserlib.ResourceBase):
   """/2/jobs/[job_id]/wait resource.
+
+  OpenAPI BEGIN
+  /2/jobs/{job_id}/wait:
+    get:
+      summary: "Wait for changes on a job"
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema:
+            type: integer
+          description: "Ganeti Job ID"
+        - in: query
+          name: fields
+          required: false
+          description: "The job fields on which to watch for changes"
+          schema:
+            type: string
+        - in: query
+          name: previous_job_info
+          required: false
+          description: "Previously received field values or None if not yet available"
+          schema:
+            type: array
+            nullable: true
+            items:
+              type: string
+        - in: query
+          name: previous_log_serial
+          required: false
+          description: "Highest log serial number received so far or None if not yet available"
+          schema:
+            type: integer
+            nullable: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: string
+                    nullable: true
+                  - type: object
+                    properties:
+                      job_info:
+                        type: object
+                        additionalProperties: {}
+                      log_netries:
+                        type: object
+                        additionalProperties: {}
+        '404':
+          description: Job Resource Not Found
+      tags:
+        - Jobs
+  OpenAPI END
 
   """
   # WaitForJobChange provides access to sensitive information and blocks
@@ -570,6 +980,126 @@ class R_2_jobs_id_wait(baserlib.ResourceBase):
 class R_2_nodes(baserlib.OpcodeResource):
   """/2/nodes resource.
 
+  OpenAPI BEGIN
+  /2/nodes:
+    get:
+      summary: "List Ganeti Nodes"
+      parameters:
+        - in: query
+          name: bulk
+          description: "Bulk output"
+          schema:
+            type: integer
+            enum: [0, 1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        uri:
+                          type: string
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        cnodes:
+                          type: integer
+                        cnos:
+                          type: integer
+                        csockets:
+                          type: integer
+                        ctime:
+                          type: number
+                        ctotal:
+                          type: integer
+                        dfree:
+                          type: integer
+                        drained:
+                          type: boolean
+                        dtotal:
+                          type: integer
+                        group.uuid:
+                          type: string
+                          format: uuid
+                        master_candidate:
+                          type: boolean
+                        master_capable:
+                          type: boolean
+                        mfree:
+                          type: integer
+                        mnode:
+                          type: integer
+                        mtime:
+                          type: number
+                        mtotal:
+                          type: integer
+                        name:
+                          type: string
+                        ndparams:
+                          type: object
+                          properties:
+                            cpu_speed:
+                              type: integer
+                            exclusive_storage:
+                              type: boolean
+                            oob_program:
+                              type: string
+                            ovs:
+                              type: boolean
+                            ovs_link:
+                              type: string
+                            ovs_name:
+                              type: string
+                            spindle_count:
+                              type: integer
+                            ssh_port:
+                              type: integer
+                        offline:
+                          type: boolean
+                        pinst_cnt:
+                          type: integer
+                        pinst_list:
+                          type: array
+                          items:
+                            type: string
+                        pip:
+                          type: string
+                        role:
+                          type: string
+                        serial_no:
+                          type: integer
+                        sinst_cnt:
+                          type: integer
+                        sinst_list:
+                          type: array
+                          items:
+                            type: string
+                        sip:
+                          type: string
+                        spfree:
+                          type: integer
+                        sptotal:
+                          type: integer
+                        tags:
+                          type: array
+                          items:
+                            type: string
+                        uuid:
+                          type: string
+                          format: uuid
+                        vm_capable:
+                          type: boolean
+      tags:
+        - Nodes
+  OpenAPI END
   """
 
   def GET(self):
@@ -591,6 +1121,115 @@ class R_2_nodes(baserlib.OpcodeResource):
 class R_2_nodes_name(baserlib.OpcodeResource):
   """/2/nodes/[node_name] resource.
 
+  OpenAPI BEGIN
+  /2/nodes/{node_name}:
+    get:
+      summary: "Retrieve specific Ganeti Node"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Ganeti Node Name (FQDN)"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cnodes:
+                    type: integer
+                  cnos:
+                    type: integer
+                  csockets:
+                    type: integer
+                  ctime:
+                    type: number
+                  ctotal:
+                    type: integer
+                  dfree:
+                    type: integer
+                  drained:
+                    type: boolean
+                  dtotal:
+                    type: integer
+                  group.uuid:
+                    type: string
+                    format: uuid
+                  master_candidate:
+                    type: boolean
+                  master_capable:
+                    type: boolean
+                  mfree:
+                    type: integer
+                  mnode:
+                    type: integer
+                  mtime:
+                    type: number
+                  mtotal:
+                    type: integer
+                  name:
+                    type: string
+                  ndparams:
+                    type: object
+                    properties:
+                      cpu_speed:
+                        type: integer
+                      exclusive_storage:
+                        type: boolean
+                      oob_program:
+                        type: string
+                      ovs:
+                        type: boolean
+                      ovs_link:
+                        type: string
+                      ovs_name:
+                        type: string
+                      spindle_count:
+                        type: integer
+                      ssh_port:
+                        type: integer
+                  offline:
+                    type: boolean
+                  pinst_cnt:
+                    type: integer
+                  pinst_list:
+                    type: array
+                    items:
+                      type: string
+                  pip:
+                    type: string
+                  role:
+                    type: string
+                  serial_no:
+                    type: integer
+                  sinst_cnt:
+                    type: integer
+                  sinst_list:
+                    type: array
+                    items:
+                      type: string
+                  sip:
+                    type: string
+                  spfree:
+                    type: integer
+                  sptotal:
+                    type: integer
+                  tags:
+                    type: array
+                    items:
+                      type: string
+                  uuid:
+                    type: string
+                    format: uuid
+                  vm_capable:
+                    type: boolean
+      tags:
+        - Nodes
+  OpenAPI END
   """
   GET_ALIASES = {
     "sip": "secondary_ip",
@@ -613,6 +1252,27 @@ class R_2_nodes_name(baserlib.OpcodeResource):
 class R_2_nodes_name_powercycle(baserlib.OpcodeResource):
   """/2/nodes/[node_name]/powercycle resource.
 
+  OpenAPI BEGIN
+  /2/nodes/{node_name}/powercycle:
+    post:
+      summary: "Powercycle a node"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Ganeti Node Name (FQDN)"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: "Returns  Ganeti Job ID on success"
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Nodes
+  OpenAPI END
   """
   POST_OPCODE = opcodes.OpNodePowercycle
 
@@ -628,6 +1288,67 @@ class R_2_nodes_name_powercycle(baserlib.OpcodeResource):
 
 class R_2_nodes_name_role(baserlib.OpcodeResource):
   """/2/nodes/[node_name]/role resource.
+
+  OpenAPI BEGIN
+  /2/nodes/{node_name}/role:
+    get:
+      summary: "Retrieves a Ganeti Node's Role"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Ganeti Node Name (FQDN)"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                type: string
+                enum: ["drained", "master-candidate", "offline", "regular"]
+      tags:
+        - Nodes
+    put:
+      summary: "Set a Ganeti Node's Role"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Ganeti Node Name (FQDN)"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              enum: ["drained", "master-candidate", "offline", "regular"]
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  node_name:
+                    type: string
+                  master_candidate:
+                    type: boolean
+                  offline:
+                    type: boolean
+                  drained:
+                    type: boolean
+                  force:
+                    type: boolean
+                  auto_promote:
+                    type: boolean
+      tags:
+        - Nodes
+  OpenAPI END
 
   """
   PUT_OPCODE = opcodes.OpNodeSetParams
@@ -688,6 +1409,63 @@ class R_2_nodes_name_role(baserlib.OpcodeResource):
 class R_2_nodes_name_evacuate(baserlib.OpcodeResource):
   """/2/nodes/[node_name]/evacuate resource.
 
+  OpenAPI BEGIN
+  /2/nodes/{node_name}/evacuate:
+    post:
+      summary: "Evacuate a node"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Ganeti Node Name (FQDN)"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                allow_runtime_changes:
+                  type: boolean
+                  nullable: true
+                iallocator:
+                  type: string
+                  nullable: true
+                ignore_ipolicy:
+                  type: boolean
+                live:
+                  type: boolean
+                  description: "obsolete, do not use"
+                mode:
+                  type: string
+                  enum: ["live", "non-live"]
+                  description: "Migration type (live/non-live)"
+                node_uuid:
+                  type: string
+                  format: uuid
+                  description: "A node UUID (for single-node LUs)"
+                  nullable: true
+                target_node:
+                  type: string
+                  description: "Target node for instance migration/failover"
+                  nullable: true
+                target_node:
+                  type: string
+                  description: "Target node UUID for instance migration/failover"
+                  format: uuid
+                  nullable: true
+      responses:
+        '200':
+          description: "Returns Ganeti Job ID on success"
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Nodes
+  OpenAPI END
   """
   POST_OPCODE = opcodes.OpNodeEvacuate
 
@@ -704,6 +1482,27 @@ class R_2_nodes_name_evacuate(baserlib.OpcodeResource):
 class R_2_nodes_name_migrate(baserlib.OpcodeResource):
   """/2/nodes/[node_name]/migrate resource.
 
+  OpenAPI BEGIN
+  /2/nodes/{node_name}/migrate:
+    post:
+      summary: "Migrate all primary instances from a node"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Ganeti Node Name (FQDN)"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: "Returns Ganeti Job ID on success"
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Nodes
+  OpenAPI END
   """
   POST_OPCODE = opcodes.OpNodeMigrate
 
@@ -739,6 +1538,79 @@ class R_2_nodes_name_migrate(baserlib.OpcodeResource):
 class R_2_nodes_name_modify(baserlib.OpcodeResource):
   """/2/nodes/[node_name]/modify resource.
 
+  OpenAPI BEGIN
+  /2/nodes/{node_name}/modify:
+    post:
+      summary: "Modify Node settings"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Ganeti Node Name (FQDN)"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auto_promote:
+                  type: boolean
+                  description: "Whether node(s) should be promoted to master candidate if necessary"
+                drained:
+                  type: boolean
+                  nullable: true
+                  description: "Whether to mark the node as drained"
+                force:
+                  type: boolean
+                  description: "Whether to force the operation"
+                hv_state:
+                  type: object
+                  additionalProperties: {}
+                  description: "Set hypervisor states"
+                disk_state:
+                  type: object
+                  additionalProperties: {}
+                  description: "Set disk states"
+                  nullable: true
+                master_candidate:
+                  type: boolean
+                  description: "Whether the node should become a master candidate"
+                  nullable: true
+                ndparams:
+                  type: object
+                  additionalProperties: {}
+                  description: "Node parameters"
+                  nullable: true
+                node_uuid:
+                  type: string
+                  format: uuid
+                  description: "A node UUID (for single-node LUs)"
+                  nullable: true
+                offline:
+                  type: boolean
+                  description: "Whether to mark the node offline"
+                  nullable: true
+                powered:
+                  type: boolean
+                  description: "Whether the node should be marked as powered"
+                  nullable: true
+                vm_capable:
+                  type: boolean
+                  description: "Whether node can host instances"
+                  nullable: true
+                secondary_ip:
+                  type: string
+                  description: "Secondary IP address"
+                  nullable: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Nodes
+  OpenAPI END
   """
   POST_OPCODE = opcodes.OpNodeSetParams
 
@@ -836,6 +1708,126 @@ class R_2_nodes_name_storage_repair(baserlib.OpcodeResource):
 class R_2_networks(baserlib.OpcodeResource):
   """/2/networks resource.
 
+  OpenAPI BEGIN
+  /2/networks:
+    get:
+      summary: "List networks"
+      parameters:
+        - in: query
+          name: bulk
+          description: "Bulk output"
+          schema:
+            type: integer
+            enum: [0, 1]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        uri:
+                          type: string
+                  - type: array
+                    items:
+                      type: object
+                      properties:
+                        external_reservations:
+                          type: string
+                        free_count:
+                          type: integer
+                        gateway:
+                          type: string
+                        gateway6:
+                          type: string
+                        group_list:
+                          type: array
+                          items:
+                            type: string
+                        inst_list:
+                          type: array
+                          items:
+                            type: string
+                        mac_prefix:
+                          type: string
+                        map:
+                          type: string
+                        name:
+                          type: string
+                        network:
+                          type: string
+                        network6:
+                          type: string
+                        reserved_count:
+                          type: integer
+                        tags:
+                          type: array
+                          items:
+                            type: string
+                        uuid:
+                          type: string
+                          format: uuid
+      tags:
+        - Networks
+    post:
+      summary: "Add a network definition"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                add_reserved_ips:
+                  type: string
+                  description: "Which IP addresses to reserve"
+                  nullable: true
+                conflicts_check:
+                  type: boolean
+                  description: "Whether to check for conflicting IP addresses"
+                gateway:
+                  type: string
+                  format: ipv4
+                  description: "Network gateway (IPv4 address)"
+                gateway6:
+                  type: string
+                  format: ipv6
+                  description: "Network gateway (IPv6 address)"
+                mac_prefix:
+                  type: string
+                  nullable: true
+                  description: "Network specific mac prefix (that overrides the cluster one)"
+                network_name:
+                  type: string
+                network:
+                  type: string
+                  nullable: true
+                  description: "Network address (IPv4 subnet)"
+                  format: ipv4
+                network6:
+                  type: string
+                  nullable: true
+                  description: "Network address (IPv6 subnet)"
+                  format: ipv6
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Networks
+  OpenAPI END
   """
   POST_OPCODE = opcodes.OpNetworkAdd
   POST_RENAME = {
@@ -870,6 +1862,77 @@ class R_2_networks(baserlib.OpcodeResource):
 class R_2_networks_name(baserlib.OpcodeResource):
   """/2/networks/[network_name] resource.
 
+  OpenAPI BEGIN
+  /2/networks/[network_name]:
+    get:
+      summary: "Retrieve a network definition"
+      parameters:
+        - in: path
+          name: network_name
+          description: "Network Name"
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  external_reservations:
+                    type: string
+                  free_count:
+                    type: integer
+                  gateway:
+                    type: string
+                  gateway6:
+                    type: string
+                  group_list:
+                    type: array
+                    items:
+                      type: string
+                  inst_list:
+                    type: array
+                    items:
+                      type: string
+                  mac_prefix:
+                    type: string
+                  map:
+                    type: string
+                  name:
+                    type: string
+                  network:
+                    type: string
+                  network6:
+                    type: string
+                  reserved_count:
+                    type: integer
+                  tags:
+                    type: array
+                    items:
+                      type: string
+                  uuid:
+                    type: string
+                    format: uuid
+      tags:
+        - Networks
+    delete:
+      summary: "Remove a network definition"
+      parameters:
+        - in: path
+          name: network_name
+          description: "Network Name"
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Networks
+  OpenAPI END
   """
   DELETE_OPCODE = opcodes.OpNetworkRemove
 
@@ -1278,6 +2341,30 @@ class R_2_instances_name_startup(baserlib.OpcodeResource):
 
   Implements an instance startup.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/reinstall:
+    put:
+      summary: "Instance startup"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+        - in: query
+          name: force
+          description: "Start the instance even if secondary disks are failing"
+          schema:
+            type: integer
+            enum: [0, 1]
+          required: false
+      responses:
+        '200':
+          description: OK
+      tags:
+        - Instances
+  OpenAPI END
   """
   PUT_OPCODE = opcodes.OpInstanceStartup
 
@@ -1344,6 +2431,45 @@ class R_2_instances_name_reinstall(baserlib.OpcodeResource):
 
   Implements an instance reinstall.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/reinstall:
+    put:
+      summary: "Installs the operating system again"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                os:
+                  type: string
+                  description: "Instance Operation System"
+                start:
+                  type: boolean
+                  description: "Whether to start instance after reinstallation"
+                osparams:
+                  type: object
+                  additionalProperties: {}
+              required:
+                - os
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   POST_OPCODE = opcodes.OpInstanceReinstall
 
@@ -1423,6 +2549,27 @@ class R_2_instances_name_replace_disks(baserlib.OpcodeResource):
 class R_2_instances_name_activate_disks(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/activate-disks resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/activate-disks:
+    put:
+      summary: "Activate disks on an instance"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   PUT_OPCODE = opcodes.OpInstanceActivateDisks
 
@@ -1441,6 +2588,27 @@ class R_2_instances_name_activate_disks(baserlib.OpcodeResource):
 class R_2_instances_name_deactivate_disks(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/deactivate-disks resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/deactivate-disks:
+    put:
+      summary: "Recreate disks of an instance"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   PUT_OPCODE = opcodes.OpInstanceDeactivateDisks
 
@@ -1457,6 +2625,59 @@ class R_2_instances_name_deactivate_disks(baserlib.OpcodeResource):
 class R_2_instances_name_recreate_disks(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/recreate-disks resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/recreate-disks:
+    post:
+      summary: "Recreate disks of an instance"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                disks:
+                  type: array
+                  items:
+                    type: string
+                iallocator:
+                  type: string
+                  nullable: true
+                  description: "Iallocator for deciding the target node for shared-storage instances"
+                instance_uuid:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: "An instance UUID (for single-instance LUs)"
+                node_uuids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  nullable: true
+                  description: "New instance node UUIDs, if relocation is desired"
+                nodes:
+                  type: array
+                  items:
+                    type: string
+                  description: "New instance nodes, if relocation is desired"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   POST_OPCODE = opcodes.OpInstanceRecreateDisks
 
@@ -1472,6 +2693,37 @@ class R_2_instances_name_recreate_disks(baserlib.OpcodeResource):
 class R_2_instances_name_prepare_export(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/prepare-export resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/prepare-export:
+    put:
+      summary: "Prepares an export of an instance"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: ["local","remote"]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   PUT_OPCODE = opcodes.OpBackupPrepare
 
@@ -1488,6 +2740,85 @@ class R_2_instances_name_prepare_export(baserlib.OpcodeResource):
 class R_2_instances_name_export(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/export resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/export:
+    put:
+      summary: "Exports an instance"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                compress:
+                  type: string
+                  nullable: true
+                  description: "Compression mode to use for moves during backups/imports"
+                destination:
+                  type: string
+                  nullable: true
+                  description: "Target node (depends on export mode)"
+                destination_x509_ca:
+                  type: string
+                  nullable: true
+                  description: "Destination X509 CA (remote export only)"
+                x509_key_name:
+                  type: string
+                  nullable: true
+                  description: "Name of X509 key (remote export only)"
+                ignore_remove_failures:
+                  type: boolean
+                  nullable: true
+                  description: "Whether to ignore failures while removing instances"
+                long_sleep:
+                  type: boolean
+                  description: "Whether to allow long instance shutdowns during exports"
+                mode:
+                  type: string
+                  enum: ["local","remote"]
+                remove_instance:
+                  type: boolean
+                  description: "Whether to remove instance after export"
+                shutdown:
+                  type: boolean
+                  description: "Whether to shutdown the instance before export"
+                shutdown_timeout:
+                  type: integer
+                  description: "How long to wait for instance to shut down"
+                target_node_uuid:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: "Target node UUID (if local export)"
+                zero_free_space:
+                  type: boolean
+                  description: "Whether to zero the free space on the disks of the instance"
+                zeroing_timeout_fixed:
+                  type: integer
+                  nullable: true
+                  description: "The fixed part of time to wait before declaring the zeroing operation to have failed"
+                zeroing_timeout_per_mib:
+                  type: number
+                  nullable: true
+                  description: "The variable part of time to wait before declaring the zeroing operation to have failed, dependent on total size of disks"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   PUT_OPCODE = opcodes.OpBackupExport
   PUT_RENAME = {
@@ -1506,6 +2837,65 @@ class R_2_instances_name_export(baserlib.OpcodeResource):
 class R_2_instances_name_migrate(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/migrate resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/migrate:
+    post:
+      summary: "Does a failover of an instance"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                allow_runtime_changes:
+                  type: boolean
+                  description: "Whether to allow runtime changes while migrating"
+                iallocator:
+                  type: string
+                  nullable: true
+                  description: "Iallocator for deciding the target node for shared-storage instances"
+                live:
+                  type: boolean
+                  description: "Obsolete 'live' migration mode (do not use)"
+                mode:
+                  type: string
+                  enum: ["live", "non-live"]
+                  nullable: true
+                ignore_ipolicy:
+                  type: boolean
+                  description: "Whether to ignore ipolicy violations"
+                node_uuid:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: "A node UUID (for single-node LUs)"
+                target_node:
+                  type: string
+                  nullable: true
+                  description: "Target node for instance migration/failover"
+                target_node_uuid:
+                  type: string
+                  nullable: true
+                  description: "Target node UUID for instance migration/failover"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
+
   """
   PUT_OPCODE = opcodes.OpInstanceMigrate
 
@@ -1521,6 +2911,63 @@ class R_2_instances_name_migrate(baserlib.OpcodeResource):
 class R_2_instances_name_failover(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/failover resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/failover:
+    put:
+      summary: "Does a failover of an instance"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cleanup:
+                  type: boolean
+                  description: "Whether a previously failed migration should be cleaned up"
+                iallocator:
+                  type: string
+                  nullable: true
+                  description: "Iallocator for deciding the target node for shared-storage instances"
+                ignore_consistency:
+                  type: boolean
+                  description: "Whether to ignore disk consistency"
+                ignore_ipolicy:
+                  type: boolean
+                  description: "Whether to ignore ipolicy violations"
+                shutdown_timeout:
+                  type: integer
+                  description: "How long to wait for instance to shut down"
+                instance_uuid:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: "An instance UUID (for single-instance LUs)"
+                target_node:
+                  type: string
+                  nullable: true
+                  description: "Target node for instance migration/failover"
+                target_node_uuid:
+                  type: string
+                  nullable: true
+                  description: "Target node UUID for instance migration/failover"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   PUT_OPCODE = opcodes.OpInstanceFailover
 
@@ -1536,6 +2983,50 @@ class R_2_instances_name_failover(baserlib.OpcodeResource):
 class R_2_instances_name_rename(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/rename resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/rename:
+    put:
+      summary: "Rename an Instance"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ip_check:
+                  type: boolean
+                  description: "Whether to ensure instances' IP address is inactive"
+                new_name:
+                  type: string
+                  description: "New instance name"
+                name_check:
+                  type: boolean
+                  description: "Whether to check name"
+                instance_uuid:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: "An instance UUID (for single-instance LUs)"
+              required:
+                - new_name
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   PUT_OPCODE = opcodes.OpInstanceRename
 
@@ -1573,6 +3064,60 @@ class R_2_instances_name_modify(baserlib.OpcodeResource):
 class R_2_instances_name_disk_grow(baserlib.OpcodeResource):
   """/2/instances/[instance_name]/disk/[disk_index]/grow resource.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/disk/{disk_index}/grow:
+    post:
+      summary: "Grow an Instances' disk"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+        - in: path
+          name: disk_index
+          description: "Disk Index"
+          schema:
+            type: integer
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                absolute:
+                  type: boolean
+                  description: "Whether the amount parameter is an absolute target or a relative one"
+                amount:
+                  type: integer
+                  nullable: true
+                  description: "Disk amount to add or grow to"
+                ignore_ipolicy:
+                  type: boolean
+                  description: "Whether to ignore ipolicy violations"
+                instance_uuid:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: "An instance UUID (for single-instance LUs)"
+                wait_for_sync:
+                  type: boolean
+                  description: "Whether to wait for the disk to synchronize"
+              required:
+                - amount
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: integer
+      tags:
+        - Instances
+  OpenAPI END
   """
   POST_OPCODE = opcodes.OpInstanceGrowDisk
 
@@ -1588,6 +3133,53 @@ class R_2_instances_name_disk_grow(baserlib.OpcodeResource):
 
 class R_2_instances_name_console(baserlib.ResourceBase):
   """/2/instances/[instance_name]/console resource.
+
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/console:
+    get:
+      summary: "Retrieve Information how to connect to the Instances' Console"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  instance:
+                    type: string
+                    description: "Instance Name"
+                  kind:
+                    type: string
+                    enum: ["ssh", "vnc", "spice", "msg"]
+                  message:
+                    type: string
+                    description: "Message to display (only type `msg`)"
+                  host:
+                    type: string
+                    description: "Host to connect to (only types `ssh`, `vnc`, `spice`)"
+                  port:
+                    type: integer
+                    description: "TCP Port to connect to (only types `vnc`, `spice`)"
+                  user:
+                    type: string
+                    description: "Username to use (only type `ssh`)"
+                  command:
+                    type: string
+                    description: "Command to execute on the machine (only type `ssh`)"
+                  display:
+                    type: integer
+                    description: "VNC Display Number (only type `vnc`)"
+      tags:
+        - Instances
+  OpenAPI END
 
   """
   GET_ACCESS = [rapi.RAPI_ACCESS_WRITE, rapi.RAPI_ACCESS_READ]
@@ -1788,6 +3380,65 @@ class R_2_instances_name_tags(_R_Tags):
 
   Manages per-instance tags.
 
+  OpenAPI BEGIN
+  /2/instances/{instance_name}/tags:
+    get:
+      summary: "Retrieve Instance Tags"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+      tags:
+        - Instances
+    put:
+      summary: "Add Instance Tags"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instance Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Instances
+    delete:
+      summary: "Delete Instance Tags"
+      parameters:
+        - in: path
+          name: instance_name
+          description: "Instnance Name"
+          schema:
+            type: string
+          required: true
+      parameters:
+        - in: query
+          name: tag
+          schema:
+            type: array
+            items:
+              type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Instances
+  OpenAPI END
   """
   TAG_LEVEL = constants.TAG_INSTANCE
 
@@ -1796,6 +3447,66 @@ class R_2_nodes_name_tags(_R_Tags):
   """ /2/nodes/[node_name]/tags resource.
 
   Manages per-node tags.
+
+  OpenAPI BEGIN
+  /2/nodes/{node_name}/tags:
+    get:
+      summary: "Retrieve Node Tags"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Node Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+      tags:
+        - Nodes
+    put:
+      summary: "Add Node Tags"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Node Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Nodes
+    delete:
+      summary: "Delete Node Tags"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Node Name"
+          schema:
+            type: string
+          required: true
+      parameters:
+        - in: query
+          name: tag
+          schema:
+            type: array
+            items:
+              type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Nodes
+  OpenAPI END
 
   """
   TAG_LEVEL = constants.TAG_NODE
@@ -1806,6 +3517,65 @@ class R_2_groups_name_tags(_R_Tags):
 
   Manages per-nodegroup tags.
 
+  OpenAPI BEGIN
+  /2/groups/{group_name}/tags:
+    get:
+      summary: "Retrieve Node Group Tags"
+      parameters:
+        - in: path
+          name: group_name
+          description: "Node Group Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+      tags:
+        - Groups
+    put:
+      summary: "Add Node Group Tags"
+      parameters:
+        - in: path
+          name: group_name
+          description: "Node Group Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Groups
+    delete:
+      summary: "Delete Node Group Tags"
+      parameters:
+        - in: path
+          name: group_name
+          description: "Node Group Name"
+          schema:
+            type: string
+          required: true
+      parameters:
+        - in: query
+          name: tag
+          schema:
+            type: array
+            items:
+              type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Groups
+  OpenAPI END
   """
   TAG_LEVEL = constants.TAG_NODEGROUP
 
@@ -1815,6 +3585,65 @@ class R_2_networks_name_tags(_R_Tags):
 
   Manages per-network tags.
 
+  OpenAPI BEGIN
+  /2/networks/{network_name}/tags:
+    get:
+      summary: "Retrieve Network Tags"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Network Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+      tags:
+        - Networks
+    put:
+      summary: "Add Network Tags"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Network Name"
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Networks
+    delete:
+      summary: "Delete Network Tags"
+      parameters:
+        - in: path
+          name: node_name
+          description: "Network Name"
+          schema:
+            type: string
+          required: true
+      parameters:
+        - in: query
+          name: tag
+          schema:
+            type: array
+            items:
+              type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Networks
+  OpenAPI END
   """
   TAG_LEVEL = constants.TAG_NETWORK
 
@@ -1823,6 +3652,45 @@ class R_2_tags(_R_Tags):
   """ /2/tags resource.
 
   Manages cluster tags.
+
+  OpenAPI BEGIN
+  /2/tags:
+    get:
+      summary: "Retrieve Cluster Tags"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+      tags:
+        - Cluster
+    put:
+      summary: "Add Cluster Tags"
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Cluster
+    delete:
+      summary: "Delete Cluster Tags"
+      parameters:
+        - in: query
+          name: tag
+          schema:
+            type: array
+            items:
+              type: string
+          required: true
+      responses:
+        '200':
+          description: "OK"
+      tags:
+        - Cluster
+  OpenAPI END
 
   """
   TAG_LEVEL = constants.TAG_CLUSTER
