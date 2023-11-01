@@ -42,6 +42,7 @@ import logging
 import pwd
 import shlex
 import shutil
+import stat
 import urllib.request, urllib.error, urllib.parse
 from bitarray import bitarray
 try:
@@ -2284,11 +2285,19 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       uri = _GetDriveURI(device, extra[0], extra[1])
 
       disable_auto_ro = self.qmp.HasDynamicAutoReadOnly()
+      qemu_driver_type = "file"
+      # starting with QEMU 6.0 the 'file' driver does not
+      # accept local block devices anymore and needs to be
+      # replaced with 'host_device'
+      if os.path.exists(uri):
+        mode = os.stat(uri).st_mode
+        if stat.S_ISBLK(mode):
+          qemu_driver_type = "host_device"
 
       def drive_add_fn(filename):
         """Helper function that uses HMP to hot-add a drive."""
-        cmd = "drive_add dummy file=%s,if=none,id=%s,format=raw" % \
-          (filename, kvm_devid)
+        cmd = "drive_add dummy %s=%s,if=none,id=%s,format=raw" % \
+          (qemu_driver_type, filename, kvm_devid)
         if disable_auto_ro:
           # This is necessary for the drive_add/device_add combination to work
           # after QEMU 4.0. auto-read-only first appeared in 3.1, but 4.0
