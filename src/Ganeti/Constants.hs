@@ -2785,6 +2785,13 @@ htKvmValidDiskTypes =
                        htDiskScsiHd,
                        htDiskScsiCd]
 
+
+htMachineVersionQ35 :: String
+htMachineVersionQ35 = "q35"
+
+htMachineVersionPC :: String
+htMachineVersionPC = "pc"
+
 -- * SCSI controller types
 
 htScsiControllerLsi :: String
@@ -4144,7 +4151,7 @@ hvcDefaults =
           , (hvUsbDevices,                      PyValueEx "")
           , (hvVga,                             PyValueEx "")
           , (hvKvmExtra,                        PyValueEx "")
-          , (hvKvmMachineVersion,               PyValueEx "")
+          , (hvKvmMachineVersion,               PyValueEx htMachineVersionQ35)
           , (hvKvmMigrationCaps,                PyValueEx "")
           , (hvVnetHdr,                         PyValueEx True)])
   , (Fake, Map.fromList [(hvMigrationMode, PyValueEx htMigrationLive)])
