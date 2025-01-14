@@ -859,6 +859,9 @@ class LUClusterVerifyGroup(LogicalUnit, _VerifyErrors):
         code = self.ETYPE_ERROR
         accepted_lds = [constants.LDS_OKAY, constants.LDS_SYNC]
 
+        logging.debug("DUMPING BLOCKDEVSTATUS")
+        logging.debug(bdev_status)
+
         if bdev_status.ldisk_status in accepted_lds:
           code = self.ETYPE_WARNING
 
