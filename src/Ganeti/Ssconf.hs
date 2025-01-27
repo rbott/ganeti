@@ -104,6 +104,7 @@ instance HasStringRepr SSKey where
 -- corresponding addition.
 hvparamsSSKey :: Types.Hypervisor -> SSKey
 hvparamsSSKey Types.Kvm = SSHvparamsKvm
+hvparamsSSKey Types.KvmMicro = SSHvparamsKvmMicro
 hvparamsSSKey Types.XenPvm = SSHvparamsXenPvm
 hvparamsSSKey Types.Chroot = SSHvparamsChroot
 hvparamsSSKey Types.XenHvm = SSHvparamsXenHvm
