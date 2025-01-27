@@ -38,6 +38,7 @@ from ganeti import errors
 from ganeti.hypervisor import hv_fake
 from ganeti.hypervisor import hv_xen
 from ganeti.hypervisor import hv_kvm
+from ganeti.hypervisor import hv_kvmmicro
 from ganeti.hypervisor import hv_chroot
 from ganeti.hypervisor import hv_lxc
 
@@ -47,6 +48,7 @@ _HYPERVISOR_MAP = {
   constants.HT_XEN_HVM: hv_xen.XenHvmHypervisor,
   constants.HT_FAKE: hv_fake.FakeHypervisor,
   constants.HT_KVM: hv_kvm.KVMHypervisor,
+  constants.HT_KVM_MICRO: hv_kvmmicro.KVMMicroHypervisor,
   constants.HT_CHROOT: hv_chroot.ChrootManager,
   constants.HT_LXC: hv_lxc.LXCHypervisor,
   }

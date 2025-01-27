@@ -1701,6 +1701,9 @@ hvKvmMigrationCaps = "migration_caps"
 hvKvmPath :: String
 hvKvmPath = "kvm_path"
 
+hvKvmMicroPath :: String
+hvKvmMicroPath = "kvm_micro_path"
+
 hvKvmDiskAio :: String
 hvKvmDiskAio = "disk_aio"
 
@@ -1748,6 +1751,9 @@ hvKvmUseChroot = "use_chroot"
 
 hvKvmUserShutdown :: String
 hvKvmUserShutdown = "user_shutdown"
+
+hvKvmMicroSerialType :: String
+hvKvmMicroSerialType = "kvm_micro_serial_type"
 
 hvLxcStartupTimeout :: String
 hvLxcStartupTimeout = "startup_timeout"
@@ -1922,6 +1928,7 @@ hvsParameterTypes = Map.fromList
   , (hvKvmMachineVersion,               VTypeString)
   , (hvKvmMigrationCaps,                VTypeString)
   , (hvKvmPath,                         VTypeString)
+  , (hvKvmMicroPath,                    VTypeString)
   , (hvKvmDiskAio,                      VTypeString)
   , (hvKvmScsiControllerType,           VTypeString)
   , (hvKvmPciReservations,              VTypeInt)
@@ -1938,6 +1945,7 @@ hvsParameterTypes = Map.fromList
   , (hvKvmSpiceZlibGlzImgCompr,         VTypeString)
   , (hvKvmUseChroot,                    VTypeBool)
   , (hvKvmUserShutdown,                 VTypeBool)
+  , (hvKvmMicroSerialType,              VTypeString)
   , (hvLxcDevices,                      VTypeString)
   , (hvLxcDropCapabilities,             VTypeString)
   , (hvLxcExtraCgroups,                 VTypeString)
@@ -2682,6 +2690,9 @@ htXenHvm = Types.hypervisorToRaw XenHvm
 htKvm :: String
 htKvm = Types.hypervisorToRaw Kvm
 
+htKvmMicro :: String
+htKvmMicro = Types.hypervisorToRaw KvmMicro
+
 htChroot :: String
 htChroot = Types.hypervisorToRaw Chroot
 
@@ -2692,7 +2703,7 @@ hyperTypes :: FrozenSet String
 hyperTypes = ConstantUtils.mkSet $ map Types.hypervisorToRaw [minBound..]
 
 htsReqPort :: FrozenSet String
-htsReqPort = ConstantUtils.mkSet [htXenHvm, htKvm]
+htsReqPort = ConstantUtils.mkSet [htXenHvm, htKvm, htKvmMicro]
 
 vncBasePort :: Int
 vncBasePort = 5900
@@ -3005,6 +3016,17 @@ htKvmEnabled = "enabled"
 
 htKvmFlagValues :: FrozenSet String
 htKvmFlagValues = ConstantUtils.mkSet [htKvmDisabled, htKvmEnabled]
+
+-- * KvmMicro serial types
+
+htKvmMicroSerialIsa :: String
+htKvmMicroSerialIsa = "isa-serial"
+
+htKvmMicroSerialVirtConsole :: String
+htKvmMicroSerialVirtConsole = "virtconsole"
+
+htKvmMicroSerialVirtConsoleValues :: FrozenSet String
+htKvmMicroSerialVirtConsoleValues = ConstantUtils.mkSet [htKvmMicroSerialIsa, htKvmMicroSerialVirtConsole]
 
 -- * Migration type
 
@@ -4018,6 +4040,9 @@ ssHvparamsXenHvm = ssHvparamsPref ++ htXenHvm
 ssHvparamsXenKvm :: String
 ssHvparamsXenKvm = ssHvparamsPref ++ htKvm
 
+ssHvparamsXenKvmMicro :: String
+ssHvparamsXenKvmMicro = ssHvparamsPref ++ htKvmMicro
+
 ssHvparamsXenLxc :: String
 ssHvparamsXenLxc = ssHvparamsPref ++ htLxc
 
@@ -4031,6 +4056,7 @@ validSsHvparamsKeys =
                        ssHvparamsXenFake,
                        ssHvparamsXenHvm,
                        ssHvparamsXenKvm,
+                       ssHvparamsXenKvmMicro,
                        ssHvparamsXenPvm]
 
 ssFilePerms :: Int
@@ -4194,6 +4220,14 @@ hvcDefaults =
           , (hvKvmMachineVersion,               PyValueEx "")
           , (hvKvmMigrationCaps,                PyValueEx "")
           , (hvVnetHdr,                         PyValueEx True)])
+  , (KvmMicro, Map.fromList
+          [ (hvKvmMicroPath,                    PyValueEx kvmPath)
+          , (hvKernelPath,                      PyValueEx kvmKernel)
+          , (hvInitrdPath,                      PyValueEx "")
+          , (hvKernelArgs,                      PyValueEx "ro")
+          , (hvRootPath,                        PyValueEx "/dev/vda1")
+          , (hvAcpi,                            PyValueEx True)
+          , (hvKvmMicroSerialType,              PyValueEx htKvmMicroSerialVirtConsole)])
   , (Fake, Map.fromList [(hvMigrationMode, PyValueEx htMigrationLive)])
   , (Chroot, Map.fromList [(hvInitScript, PyValueEx "/ganeti-chroot")])
   , (Lxc, Map.fromList
