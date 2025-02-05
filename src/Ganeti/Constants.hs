@@ -1735,9 +1735,6 @@ hvKvmSpiceUseVdagent = "spice_use_vdagent"
 hvKvmSpiceZlibGlzImgCompr :: String
 hvKvmSpiceZlibGlzImgCompr = "spice_zlib_glz_wan_compression"
 
-hvKvmDebugThreads :: String
-hvKvmDebugThreads = "debug_threads"
-
 hvKvmUseChroot :: String
 hvKvmUseChroot = "use_chroot"
 
@@ -1929,7 +1926,6 @@ hvsParameterTypes = Map.fromList
   , (hvKvmSpiceUseTls,                  VTypeBool)
   , (hvKvmSpiceUseVdagent,              VTypeBool)
   , (hvKvmSpiceZlibGlzImgCompr,         VTypeString)
-  , (hvKvmDebugThreads,                 VTypeBool)
   , (hvKvmUseChroot,                    VTypeBool)
   , (hvKvmUserShutdown,                 VTypeBool)
   , (hvKvmMicroSerialType,              VTypeString)
@@ -4133,7 +4129,6 @@ hvcDefaults =
           , (hvKvmSpiceUseTls,                  PyValueEx False)
           , (hvKvmSpiceTlsCiphers,              PyValueEx opensslCiphers)
           , (hvKvmSpiceUseVdagent,              PyValueEx True)
-          , (hvKvmDebugThreads,                 PyValueEx False)
           , (hvKvmFloppyImagePath,              PyValueEx "")
           , (hvCdromImagePath,                  PyValueEx "")
           , (hvKvmCdrom2ImagePath,              PyValueEx "")
