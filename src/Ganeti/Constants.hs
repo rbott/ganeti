@@ -2992,11 +2992,6 @@ htMigrationModes :: FrozenSet String
 htMigrationModes =
   ConstantUtils.mkSet $ map Types.migrationModeToRaw [minBound..]
 
--- * Default Machine Type
-
-htKvmMachineVersionPc :: String
-htKvmMachineVersionPc = "pc"
-
 -- * Cluster verify steps
 
 verifyNplusoneMem :: String
@@ -4174,7 +4169,7 @@ hvcDefaults =
           , (hvUsbDevices,                      PyValueEx "")
           , (hvVga,                             PyValueEx "")
           , (hvKvmExtra,                        PyValueEx "")
-          , (hvKvmMachineVersion,               PyValueEx htKvmMachineVersionPc)
+          , (hvKvmMachineVersion,               PyValueEx "")
           , (hvKvmMigrationCaps,                PyValueEx "")
           , (hvVnetHdr,                         PyValueEx True)])
   , (KvmMicro, Map.fromList
