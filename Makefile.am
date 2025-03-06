@@ -1660,8 +1660,7 @@ EXTRA_DIST += \
 	$(HS_PROG_SRCS) \
 	src/lint-hints.hs \
 	test/hs/cli-tests-defs.sh \
-	test/hs/offline-test.sh \
-	.ghci
+	test/hs/offline-test.sh
 
 man_MANS = \
 	man/ganeti-cleaner.8 \
