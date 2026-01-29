@@ -68,6 +68,7 @@ def CloseFdNoError(fd, retries=5):
       other error than EBADF
 
   """
+  import logging
   try:
     os.close(fd)
   except OSError as err:

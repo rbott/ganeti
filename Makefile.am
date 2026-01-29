@@ -797,6 +797,7 @@ docinput = \
 	doc/design-2.16.rst \
 	doc/design-3.0.rst \
 	doc/design-3.1.rst \
+	doc/design-3.2.rst \
 	doc/design-allocation-efficiency.rst \
 	doc/design-autorepair.rst \
 	doc/design-bulk-create.rst \
@@ -852,6 +853,7 @@ docinput = \
 	doc/design-qemu-blockdev.rst \
 	doc/design-reason-trail.rst \
 	doc/design-repaird.rst \
+	doc/design-replace-asyncore.rst \
 	doc/design-reservations.rst \
 	doc/design-resource-model.rst \
 	doc/design-restricted-commands.rst \
@@ -1961,7 +1963,6 @@ python_tests_legacy = \
 	test/py/legacy/ganeti.errors_unittest.py \
 	test/py/legacy/ganeti.hooks_unittest.py \
 	test/py/legacy/ganeti.ht_unittest.py \
-	test/py/legacy/ganeti.http_unittest.py \
 	test/py/legacy/ganeti.hypervisor.hv_chroot_unittest.py \
 	test/py/legacy/ganeti.hypervisor.hv_fake_unittest.py \
 	test/py/legacy/ganeti.hypervisor.hv_kvm_unittest.py \
@@ -2032,7 +2033,10 @@ python_tests_legacy = \
 
 python_tests_unit = \
 	test/py/unit/hypervisor/hv_kvm/test_monitor.py \
-	test/py/unit/hypervisor/hv_kvm/test_bus_manager.py
+	test/py/unit/hypervisor/hv_kvm/test_bus_manager.py \
+	test/py/unit/http/test_server.py \
+	test/py/unit/http/test_ssl.py \
+	test/py/unit/server/test_rapi.py
 
 python_tests = $(python_tests_integration) $(python_tests_legacy) $(python_tests_unit)
 
@@ -2979,7 +2983,7 @@ endif
 
 coverage: $(COVERAGE_TESTS)
 
-test/py/docs_unittest.py: $(gnt_scripts)
+test/py/legacy/docs_unittest.py: $(gnt_scripts)
 
 .PHONY: py-coverage
 py-coverage: $(GENERATED_FILES) $(python_tests)
