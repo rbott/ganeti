@@ -36,7 +36,6 @@ import datetime
 import functools
 import itertools
 import threading
-import time
 
 from ganeti import constants
 
@@ -46,6 +45,7 @@ from qa_instance_utils import GetGenericAddParameters
 from qa import qa_job_utils
 from qa import qa_logging
 from qa import qa_utils
+from qa import qa_wait
 
 
 MAX_JOB_SUBMISSION_DURATION = 15.0
@@ -172,8 +172,10 @@ class _JobQueueDriver(object):
     """Wait for the completion of all registered jobs.
 
     """
-    while self._HasPendingJobs():
-      time.sleep(2)
+    # Use exponential backoff (0.5s -> 3.0s) which reduces polling overhead
+    # compared to the previous fixed 2-second intervals
+    qa_wait.WaitForJobQueuePolling(self._HasPendingJobs, timeout=300.0,
+                                    initial_wait=0.5, max_wait=3.0)
 
     with self._lock:
       if self._jobs:

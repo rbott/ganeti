@@ -32,13 +32,12 @@
 
 """
 
-import time
-
 from ganeti import query
 from ganeti.utils import retry
 
 from qa import qa_job_utils
 from qa import qa_utils
+from qa import qa_wait
 from qa_utils import AssertCommand, AssertEqual, AssertIn, stdout_of
 
 
@@ -299,7 +298,9 @@ def TestFilterAcceptPause():
     "0.01",
   ]))
 
-  time.sleep(5)  # give some time to get queued
+  # Wait for filter effects with exponential backoff (0.3s -> 2.0s)
+  # which is typically faster than the previous fixed 5s wait
+  qa_wait.WaitForFilterEffect(timeout=6.0)
 
   AssertStatusRetry(jid1, "queued")  # job should be paused
   AssertStatusRetry(jid2, "success")  # job should not be paused
@@ -308,8 +309,8 @@ def TestFilterAcceptPause():
   AssertCommand(["gnt-filter", "delete", uuid1])
   AssertCommand(["gnt-filter", "delete", uuid2])
 
-  # Now the paused job should run through.
-  time.sleep(5)
+  # Now the paused job should run through - wait for scheduler to process
+  qa_wait.WaitForFilterEffect(timeout=6.0)
   AssertStatusRetry(jid1, "success")
 
   AssertCommand(["gnt-cluster", "watcher", "continue"])
@@ -344,7 +345,9 @@ def TestFilterRateLimit():
     "gnt-debug", "delay", "--print-jobid", "--submit", "200"
   ]))
 
-  time.sleep(5)  # give the scheduler some time to notice
+  # Wait for scheduler to process jobs with exponential backoff (0.3s -> 2.0s)
+  # which is typically faster than the previous fixed 5s wait
+  qa_wait.WaitForFilterEffect(timeout=6.0)
 
   AssertIn(GetJobStatus(jid1), ["running", "waiting"],
            msg="Job should not be rate-limited")
@@ -381,7 +384,9 @@ def TestAdHocReasonRateLimit():
     "--reason=rate-limit:2:hello", "200",
   ]))
 
-  time.sleep(5)  # give the scheduler some time to notice
+  # Wait for scheduler to process jobs with exponential backoff (0.3s -> 2.0s)
+  # which is typically faster than the previous fixed 5s wait
+  qa_wait.WaitForFilterEffect(timeout=6.0)
 
   AssertIn(GetJobStatus(jid1), ["running", "waiting"],
            msg="Job should not be rate-limited")

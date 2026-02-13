@@ -32,14 +32,13 @@
 
 """
 
-import time
-
 from ganeti import utils
 from ganeti import pathutils
 
 from qa import qa_config
 from qa import qa_utils
 from qa import qa_error
+from qa import qa_wait
 
 from qa_utils import AssertMatch, AssertCommand, StartSSH, GetCommandOutput
 
@@ -138,10 +137,9 @@ def TestInstanceAutomaticRestart(instance):
   _ShutdownInstance(inst_name)
 
   RunWatcherDaemon()
-  time.sleep(5)
-
-  if not _InstanceRunning(inst_name):
-    raise qa_error.Error("Daemon didn't restart instance")
+  # Wait for watcher to restart the instance using exponential backoff
+  # (0.5s -> 3.0s) which is typically faster than the previous fixed 5s wait
+  qa_wait.WaitForInstanceState(inst_name, running=True, timeout=10.0)
 
   AssertCommand(["gnt-instance", "info", inst_name])
 
@@ -158,7 +156,9 @@ def TestInstanceConsecutiveFailures(instance):
   for should_start in ([True] * 5) + [False]:
     _ShutdownInstance(inst_name)
     RunWatcherDaemon()
-    time.sleep(5)
+    # Wait for watcher action with exponential backoff (0.5s -> 3.0s)
+    # which is typically faster than the previous fixed 5s wait
+    qa_wait.WaitForWatcherAction(timeout=10.0)
 
     if bool(_InstanceRunning(inst_name)) != should_start:
       if should_start:

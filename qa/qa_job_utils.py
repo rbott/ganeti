@@ -35,7 +35,6 @@
 import re
 import sys
 import threading
-import time
 
 from ganeti import constants
 from ganeti import locking
@@ -45,6 +44,7 @@ from ganeti.utils import retry
 from qa import qa_config
 from qa import qa_logging
 from qa import qa_error
+from qa import qa_wait
 
 from qa_utils import AssertCommand, GetCommandOutput, GetObjectInfo, stdout_of
 
@@ -374,8 +374,8 @@ def RunWithLocks(fn, locks, timeout, block, *args, **kwargs):
     '--predicates=[["reason", ["=", "source", "gnt:watcher"]]]',
     "--action=REJECT"
   ])
-  while stdout_of(["gnt-job", "list", "--no-header", "--running"]) != "":
-    time.sleep(1)
+  # Wait for running jobs to finish using exponential backoff
+  qa_wait.WaitForJobsToFinish(timeout=60.0, initial_wait=0.5, max_wait=2.0)
 
   # Find out the lock names prior to starting the delay function
   lock_name_map = _FindLockNames(locks)
@@ -403,7 +403,10 @@ def RunWithLocks(fn, locks, timeout, block, *args, **kwargs):
         test_blocked = True
         break
 
-      time.sleep(5) # Set arbitrarily
+      # Use SmartSleep with exponential backoff for checking locks
+      # Starts at 0.5s and grows to 3s which is more efficient than fixed 5s
+      qa_wait.SmartSleep(5.0, check_fn=lambda: not qa_thread.is_alive(),
+                         check_interval=0.5)
 
     # The thread should be either finished or unblocked at this point
     qa_thread.join()

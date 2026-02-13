@@ -34,7 +34,6 @@
 
 import os
 import re
-import time
 import yaml
 
 from ganeti import utils
@@ -47,6 +46,7 @@ from qa import qa_config
 from qa import qa_daemon
 from qa import qa_utils
 from qa import qa_error
+from qa import qa_wait
 
 from qa_filters import stdout_of
 from qa_utils import AssertCommand, AssertEqual, AssertIn
@@ -1418,7 +1418,11 @@ def _TestInstanceUserDownXen(instance):
 def _TestInstanceUserDownKvm(instance):
   def _StopKVMInstance():
     AssertCommand("pkill -f \"\\-name %s\"" % instance.name, node=primary)
-    time.sleep(10)
+    # Wait for KVM process to fully terminate and cleanup to complete
+    # Using exponential backoff (0.5s -> 5.0s) which can be faster than
+    # the previous fixed 10s wait if the process stops quickly
+    qa_wait.SmartSleep(10.0, check_fn=lambda: _InstanceRunning(instance.name),
+                       check_interval=0.5)
 
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
   AssertCommand(["gnt-instance", "modify", "-H", "user_shutdown=true",

@@ -35,7 +35,6 @@
 import os
 import re
 import tempfile
-import time
 
 from ganeti import _constants
 from ganeti import constants
@@ -51,6 +50,7 @@ from qa import qa_job_utils
 from qa import qa_logging
 from qa import qa_rapi
 from qa import qa_utils
+from qa import qa_wait
 
 from qa_utils import AssertEqual, AssertCommand, AssertRedirectedCommand, \
   GetCommandOutput, CheckFileUnmodified
@@ -1126,11 +1126,9 @@ def _TestClusterModifyUserShutdownXen(nodes):
   """
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
 
-  # Give time for kvmd to start and stop on all nodes
-  time.sleep(5)
-
-  for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
+  # Wait for kvmd cycle using exponential backoff (0.3s -> 2.0s)
+  # which is typically faster than the previous fixed 5s wait
+  qa_wait.WaitForDaemonCycle("ganeti-kvmd", nodes, running=False, timeout=8.0)
 
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
 
@@ -1145,14 +1143,11 @@ def _TestClusterModifyUserShutdownKvm(nodes):
   according to '--user-shutdown' and whether the node is VM capable.
 
   """
-  # How much time to wait for kvmd to start/stop
-  kvmd_cycle_time = 4
-
   # Start kvmd on all nodes
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
-  time.sleep(kvmd_cycle_time)
-  for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node)
+  # Wait for kvmd to start using exponential backoff (0.3s -> 2.0s)
+  # which is typically faster than the previous fixed 4s wait
+  qa_wait.WaitForDaemonCycle("ganeti-kvmd", nodes, running=True, timeout=8.0)
 
   # Test VM capable node attribute
   test_node = None
@@ -1168,34 +1163,28 @@ def _TestClusterModifyUserShutdownKvm(nodes):
 
   # Stop kvmd by disabling vm capable
   AssertCommand(["gnt-node", "modify", "--vm-capable=no", test_node.primary])
-  time.sleep(kvmd_cycle_time)
-  AssertCommand("pgrep ganeti-kvmd", node=test_node, fail=True)
+  qa_wait.WaitForProcessState("ganeti-kvmd", test_node, running=False,
+                              timeout=8.0, initial_wait=0.3, max_wait=2.0)
 
   # Start kvmd by enabling vm capable
   AssertCommand(["gnt-node", "modify", "--vm-capable=yes", test_node.primary])
-  time.sleep(kvmd_cycle_time)
-  AssertCommand("pgrep ganeti-kvmd", node=test_node)
+  qa_wait.WaitForProcessState("ganeti-kvmd", test_node, running=True,
+                              timeout=8.0, initial_wait=0.3, max_wait=2.0)
 
   # Stop kvmd on all nodes by removing KVM from the enabled hypervisors
   enabled_hypervisors = qa_config.GetEnabledHypervisors()
 
   AssertCommand(["gnt-cluster", "modify", "--enabled-hypervisors=xen-pvm"])
-  time.sleep(kvmd_cycle_time)
-  for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
+  qa_wait.WaitForDaemonCycle("ganeti-kvmd", nodes, running=False, timeout=8.0)
 
   # Start kvmd on all nodes by restoring KVM to the enabled hypervisors
   AssertCommand(["gnt-cluster", "modify",
                  "--enabled-hypervisors=%s" % ",".join(enabled_hypervisors)])
-  time.sleep(kvmd_cycle_time)
-  for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node)
+  qa_wait.WaitForDaemonCycle("ganeti-kvmd", nodes, running=True, timeout=8.0)
 
   # Stop kvmd on all nodes
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=false"])
-  time.sleep(kvmd_cycle_time)
-  for node in nodes:
-    AssertCommand("pgrep ganeti-kvmd", node=node, fail=True)
+  qa_wait.WaitForDaemonCycle("ganeti-kvmd", nodes, running=False, timeout=8.0)
 
 
 def TestClusterModifyUserShutdown():
