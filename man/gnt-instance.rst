@@ -752,8 +752,43 @@ migration\_downtime
     pages. Default value is 30ms, but you may need to increase this
     value for busy instances.
 
-    This option is only effective with kvm versions >= 87 and qemu-kvm
-    versions >= 0.11.0.
+migration\_downtime\_max
+    Valid for the KVM hypervisor.
+
+    Maximum downtime budget (in ms) that Ganeti may raise QEMU's
+    ``downtime-limit`` to during a live migration that is not
+    converging. Default ``0`` (feature disabled).
+
+    When set to a value greater than ``migration_downtime``, Ganeti
+    monitors the ratio of transferred RAM to total RAM. Once the ratio
+    exceeds 200% (i.e. the guest is dirtying memory faster than it is
+    being copied), Ganeti raises QEMU's ``downtime-limit`` by 20%
+    every 30 seconds, up to the configured ceiling. A minimum step of
+    +1 ms prevents stalling at very small values.
+
+    This feature is intended for clusters that do not use postcopy
+    migration (``kvm_migration_caps`` with ``postcopy-ram``). When
+    postcopy is active the bump logic is automatically skipped.
+
+    If set, the value must be greater than or equal to ``migration_downtime``.
+
+migration\_cancel\_threshold
+    Valid for the KVM hypervisor.
+
+    Transferred-RAM percentage at which Ganeti cancels a stuck live
+    migration. Default ``0`` (feature disabled). Valid values are ``0``
+    or any integer greater than ``100``.
+
+    When set and the transferred-RAM percentage exceeds the threshold,
+    Ganeti issues ``migrate_cancel`` via QMP. This bounds runaway
+    migrations that neither converge nor benefit from the downtime-bump
+    fallback.
+
+    The cancel check runs *before* the downtime bump, so an operator
+    who configures both knobs gets cancel-overrides-bump semantics
+    (e.g. ``migration_downtime_max=2000,
+    migration_cancel_threshold=500`` - try to rescue, give up at
+    500%).
 
 cpu\_mask
     Valid for the Xen, KVM and LXC hypervisors.

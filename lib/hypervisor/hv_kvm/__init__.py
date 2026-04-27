@@ -65,6 +65,7 @@ from ganeti import utils
 from ganeti import constants
 from ganeti import errors
 from ganeti import objects
+from ganeti import serializer
 from ganeti import uidpool
 from ganeti import ssconf
 from ganeti import netutils
@@ -87,7 +88,8 @@ from ganeti.hypervisor.hv_kvm.validation import check_boot_parameters, \
                                                 validate_security_model, \
                                                 validate_spice_parameters, \
                                                 validate_vnc_parameters, \
-                                                validate_disk_parameters
+                                                validate_disk_parameters, \
+                                                validate_migration_parameters
 
 from ganeti.hypervisor.hv_kvm import kvm_utils
 
@@ -421,6 +423,12 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     constants.HV_MIGRATION_PORT: hv_base.REQ_NET_PORT_CHECK,
     constants.HV_MIGRATION_BANDWIDTH: hv_base.REQ_NONNEGATIVE_INT_CHECK,
     constants.HV_MIGRATION_DOWNTIME: hv_base.REQ_NONNEGATIVE_INT_CHECK,
+    constants.HV_MIGRATION_DOWNTIME_MAX: hv_base.REQ_NONNEGATIVE_INT_CHECK,
+    constants.HV_MIGRATION_CANCEL_THRESHOLD:
+      (False, lambda x: x == 0 or x > 100,
+       "migration_cancel_threshold must be 0 (disabled) or greater than"
+       " 100 (percent)",
+       None, None),
     constants.HV_MIGRATION_MODE: hv_base.MIGRATION_MODE_CHECK,
     constants.HV_USE_GUEST_AGENT: hv_base.NO_CHECK,
     constants.HV_USE_LOCALTIME: hv_base.NO_CHECK,
@@ -465,6 +473,9 @@ class KVMHypervisor(hv_base.BaseHypervisor):
 
   _MIGRATION_INFO_MAX_BAD_ANSWERS = 5
   _MIGRATION_INFO_RETRY_DELAY = 2
+  _MIGRATION_DOWNTIME_THRESHOLD_RATIO = 2.0   # 200 % transferred
+  _MIGRATION_DOWNTIME_STEP_INTERVAL = 30      # seconds between bumps
+  _MIGRATION_DOWNTIME_STEP_FACTOR = 1.20      # +20 % per step
 
   _VERSION_RE = re.compile(r"\b(\d+)\.(\d+)(\.(\d+))?\b")
 
@@ -717,6 +728,34 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     return utils.PathJoin(cls._CONF_DIR, "%s.runtime" % instance_name)
 
   @classmethod
+  def _InstanceMigrationState(cls, instance_name):
+    """Returns the path to the migration-downtime state file.
+
+    """
+    return utils.PathJoin(cls._CTRL_DIR, "%s.migstate" % instance_name)
+
+  @classmethod
+  def _ReadMigrationState(cls, instance_name):
+    """Read the migration-downtime state file, or return None.
+
+    """
+    path = cls._InstanceMigrationState(instance_name)
+    try:
+      return serializer.LoadJson(utils.ReadFile(path))
+    except EnvironmentError as err:
+      if err.errno == errno.ENOENT:
+        return None
+      raise
+
+  @classmethod
+  def _WriteMigrationState(cls, instance_name, state):
+    """Atomically write the migration-downtime state file.
+
+    """
+    utils.WriteFile(cls._InstanceMigrationState(instance_name),
+                    data=serializer.DumpJson(state))
+
+  @classmethod
   def _InstanceChrootDir(cls, instance_name):
     """Returns the name of the KVM chroot dir of the instance
 
@@ -764,6 +803,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     utils.RemoveFile(cls._InstanceQmpMonitor(instance_name))
     utils.RemoveFile(cls._InstanceQemuGuestAgentMonitor(instance_name))
     utils.RemoveFile(cls._InstanceKVMRuntime(instance_name))
+    utils.RemoveFile(cls._InstanceMigrationState(instance_name))
     uid_file = cls._InstanceUidFile(instance_name)
     uid = cls._TryReadUidFile(uid_file)
     utils.RemoveFile(uid_file)
@@ -2605,6 +2645,14 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     self.qmp.SetMigrationParameters(max_bandwidth_in_bytes,
         instance.hvparams[constants.HV_MIGRATION_DOWNTIME])
 
+    base_downtime = instance.hvparams[constants.HV_MIGRATION_DOWNTIME]
+    ceiling = instance.hvparams[constants.HV_MIGRATION_DOWNTIME_MAX]
+    if ceiling > base_downtime:
+      utils.RemoveFile(self._InstanceMigrationState(instance_name))
+      self._WriteMigrationState(instance_name,
+                                {"downtime": base_downtime,
+                                 "last_step": time.time()})
+
     self._SetInstanceMigrationCapabilities(instance)
     self.qmp.StartMigration(target, port)
 
@@ -2618,6 +2666,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     @param success: whether the migration succeeded or not
 
     """
+    utils.RemoveFile(self._InstanceMigrationState(instance.name))
     if success:
       self._DeConfigureAllNICs(instance)
       pidfile, pid, _ = self._InstancePidAlive(instance.name)
@@ -2634,6 +2683,83 @@ class KVMHypervisor(hv_base.BaseHypervisor):
       else:
         self._DeConfigureAllNICs(instance)
         self.CleanupInstance(instance.name)
+
+  def _MaybeCancelStuckMigration(self, instance, status):
+    """Cancel the migration if transferred-ram percentage exceeds the
+    configured threshold. Returns True if a cancel was issued.
+
+    """
+    threshold = instance.hvparams[constants.HV_MIGRATION_CANCEL_THRESHOLD]
+    if threshold <= 0:
+      return False
+    if not status.total_ram:
+      return False
+    pct = 100.0 * status.transferred_ram / status.total_ram
+    if pct <= threshold:
+      return False
+    logging.warning("Live migration of %s exceeded cancel threshold"
+                    " (%.0f%% transferred > %d%%); cancelling",
+                    instance.name, pct, threshold)
+    try:
+      self.qmp.CancelMigration()
+    except (errors.HypervisorError, OSError) as err:
+      logging.warning("migrate_cancel failed for %s: %s",
+                      instance.name, err)
+    return True
+
+  def _MaybeBumpMigrationDowntime(self, instance, status, query_migrate):
+    """Raise QEMU's downtime-limit if the migration is stuck.
+
+    """
+    base = instance.hvparams[constants.HV_MIGRATION_DOWNTIME]
+    ceiling = instance.hvparams[constants.HV_MIGRATION_DOWNTIME_MAX]
+    if ceiling <= base:
+      return
+    # postcopy makes downtime irrelevant
+    caps = instance.hvparams[constants.HV_KVM_MIGRATION_CAPS] or ""
+    if "postcopy-ram" in caps:
+      return
+    if status.postcopy_status is not None:
+      return
+    if query_migrate.get("status") == "postcopy-active":
+      return
+    if not status.total_ram:
+      return
+    ratio = status.transferred_ram / status.total_ram
+    if ratio < self._MIGRATION_DOWNTIME_THRESHOLD_RATIO:
+      return
+    state = self._ReadMigrationState(instance.name) or \
+            {"downtime": base, "last_step": 0}
+    if state["downtime"] >= ceiling:
+      return
+    now = time.time()
+    if now - state["last_step"] < self._MIGRATION_DOWNTIME_STEP_INTERVAL:
+      return
+    # +20 % geometric, with a +1 ms floor so growth doesn't stall on small
+    # values (e.g. base 1 ms: int(1*1.1) == 1).
+    new_downtime = min(
+        max(state["downtime"] + 1,
+            int(state["downtime"] * self._MIGRATION_DOWNTIME_STEP_FACTOR)),
+        ceiling)
+    if new_downtime <= state["downtime"]:
+      return
+    try:
+      self.qmp.SetMigrationDowntime(new_downtime)
+    except (errors.HypervisorError, OSError) as err:
+      logging.info("Could not raise migration downtime for %s"
+                   " (migration likely finishing): %s",
+                   instance.name, err)
+      return
+    logging.info("Live migration of %s stuck at %.0f%% transferred;"
+                 " raising downtime-limit %d -> %d ms (cap %d)",
+                 instance.name, ratio * 100,
+                 state["downtime"], new_downtime, ceiling)
+    status.migration_downtime = new_downtime
+    state_path = self._InstanceMigrationState(instance.name)
+    if os.path.exists(state_path):
+      self._WriteMigrationState(instance.name,
+                                {"downtime": new_downtime,
+                                 "last_step": now})
 
   @_with_qmp
   def GetMigrationStatus(self, instance):
@@ -2678,6 +2804,11 @@ class KVMHypervisor(hv_base.BaseHypervisor):
                 # ["postcopy_status"] is introduced
                 migration_status.postcopy_status = \
                     constants.HV_KVM_MIGRATION_POSTCOPY_ACTIVE
+
+            if not self._MaybeCancelStuckMigration(instance,
+                                                   migration_status):
+              self._MaybeBumpMigrationDowntime(instance, migration_status,
+                                               query_migrate)
 
           return migration_status
         else:
@@ -2816,6 +2947,7 @@ class KVMHypervisor(hv_base.BaseHypervisor):
     """
     super(KVMHypervisor, cls).ValidateParameters(hvparams)
 
+    validate_migration_parameters(hvparams)
     validate_security_model(hvparams)
     validate_vnc_parameters(hvparams)
 

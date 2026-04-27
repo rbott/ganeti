@@ -207,6 +207,20 @@ def check_disk_cache_parameters(hvparams):
     return True
 
 
+def validate_migration_parameters(hvparams):
+    """Validate cross-parameter constraints for migration knobs.
+
+    Rejects 0 < migration_downtime_max < migration_downtime.
+
+    """
+    ceiling = hvparams[constants.HV_MIGRATION_DOWNTIME_MAX]
+    base = hvparams[constants.HV_MIGRATION_DOWNTIME]
+    if 0 < ceiling < base:
+      raise errors.HypervisorError(
+          "migration_downtime_max (%d) must be 0 (disabled) or >= "
+          "migration_downtime (%d)" % (ceiling, base))
+
+
 def validate_disk_parameters(hvparams, kvm_version):
     v_all, v_maj, v_min, v_rev = kvm_version
 

@@ -745,6 +745,21 @@ class QmpConnection(QemuMonitorSocket):
     self.execute_qmp("migrate-set-parameters", arguments)
 
   @_ensure_connection
+  def SetMigrationDowntime(self, downtime_limit):
+    """Update only the live-migration downtime-limit parameter.
+
+    """
+    self.execute_qmp("migrate-set-parameters",
+                     {"downtime-limit": downtime_limit})
+
+  @_ensure_connection
+  def CancelMigration(self):
+    """Cancel the in-flight live migration.
+
+    """
+    self.execute_qmp("migrate_cancel")
+
+  @_ensure_connection
   def SetMigrationCapabilities(self, capabilities, state):
     """Configure live migration capabilities
 

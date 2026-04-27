@@ -954,7 +954,13 @@ class TLMigrateInstance(Tasklet):
                                self._MIGRATION_FEEDBACK_INTERVAL) and
           ms.transferred_ram is not None):
         mem_progress = 100 * float(ms.transferred_ram) / float(ms.total_ram)
-        self.feedback_fn("* memory transfer progress: %.2f %%" % mem_progress)
+        if ms.migration_downtime is not None:
+          self.feedback_fn("* memory transfer progress: %.2f %%,"
+                           " downtime now %d ms"
+                           % (mem_progress, ms.migration_downtime))
+        else:
+          self.feedback_fn("* memory transfer progress: %.2f %%"
+                           % mem_progress)
         last_feedback = time.time()
 
       time.sleep(self._MIGRATION_POLL_INTERVAL)

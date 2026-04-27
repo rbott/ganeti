@@ -792,12 +792,38 @@ class CfgUpgrade(object):
       raise Error("Can't find the cluster entry in the configuration")
     _removeRbdUserId(nodegroups)
 
+  @OrFail("Removing new KVM migration parameters")
+  def DowngradeNewKvmMigrationParameters(self):
+    """Strip migration_downtime_max and migration_cancel_threshold.
+
+    Pre-introduction Ganeti versions do not know these parameters;
+    leaving them in the config would surface as unknown hvparams after
+    downgrade.
+
+    """
+    keys = ("migration_downtime_max", "migration_cancel_threshold")
+    cluster = self.config_data.get("cluster")
+    if cluster is not None:
+      kvm_hvp = cluster.get("hvparams", {}).get(constants.HT_KVM)
+      if kvm_hvp is not None:
+        for k in keys:
+          kvm_hvp.pop(k, None)
+    for inst in self.config_data.get("instances", {}).values():
+      hvp = inst.get("hvparams", {})
+      for k in keys:
+        hvp.pop(k, None)
+    for grp in self.config_data.get("nodegroups", {}).values():
+      kvm_hvp = grp.get("hvparams", {}).get(constants.HT_KVM, {})
+      for k in keys:
+        kvm_hvp.pop(k, None)
+
   def DowngradeAll(self):
     self.config_data["version"] = version.BuildVersion(DOWNGRADE_MAJOR,
                                                        DOWNGRADE_MINOR, 0)
 
     self.DowngradeXenSettings()
     self.DowngradeRbdUserId()
+    self.DowngradeNewKvmMigrationParameters()
     return not self.errors
 
   def _ComposePaths(self):

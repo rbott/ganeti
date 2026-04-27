@@ -288,6 +288,7 @@ PYTHON_TEST_DIRS = \
 	test/py/unit/hypervisor/hv_kvm \
 	test/py/unit/server \
 	test/py/unit/test_data \
+	test/py/unit/tools \
 	test/py/integration
 
 ALL_APIDOC_HS_DIRS = \
@@ -2043,9 +2044,11 @@ python_tests_unit = \
 	test/py/unit/test_daemon.py \
 	test/py/unit/hypervisor/hv_kvm/test_monitor.py \
 	test/py/unit/hypervisor/hv_kvm/test_bus_manager.py \
+	test/py/unit/hypervisor/hv_kvm/test_hv_kvm_migration_downtime.py \
 	test/py/unit/http/test_server.py \
 	test/py/unit/http/test_ssl.py \
-	test/py/unit/server/test_rapi.py
+	test/py/unit/server/test_rapi.py \
+	test/py/unit/tools/test_cfgupgrade_migration.py
 
 python_tests = $(python_tests_integration) $(python_tests_legacy) $(python_tests_unit)
 
@@ -2068,7 +2071,8 @@ python_test_support = \
 	test/py/legacy/cmdlib/testsupport/ssh_mock.py \
 	test/py/legacy/cmdlib/testsupport/utils_mock.py \
 	test/py/legacy/cmdlib/testsupport/util.py \
-	test/py/legacy/cmdlib/testsupport/wconfd_mock.py
+	test/py/legacy/cmdlib/testsupport/wconfd_mock.py \
+	test/py/unit/tools/__init__.py
 
 haskell_tests = exe/htest
 

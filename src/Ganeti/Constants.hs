@@ -1773,6 +1773,12 @@ hvMigrationBandwidth = "migration_bandwidth"
 hvMigrationDowntime :: String
 hvMigrationDowntime = "migration_downtime"
 
+hvMigrationDowntimeMax :: String
+hvMigrationDowntimeMax = "migration_downtime_max"
+
+hvMigrationCancelThreshold :: String
+hvMigrationCancelThreshold = "migration_cancel_threshold"
+
 hvMigrationMode :: String
 hvMigrationMode = "migration_mode"
 
@@ -1941,6 +1947,8 @@ hvsParameterTypes = Map.fromList
   , (hvMemPath,                         VTypeString)
   , (hvMigrationBandwidth,              VTypeInt)
   , (hvMigrationDowntime,               VTypeInt)
+  , (hvMigrationDowntimeMax,            VTypeInt)
+  , (hvMigrationCancelThreshold,        VTypeInt)
   , (hvMigrationMode,                   VTypeString)
   , (hvMigrationPort,                   VTypeInt)
   , (hvNicType,                         VTypeString)
@@ -4154,6 +4162,8 @@ hvcDefaults =
           , (hvMigrationPort,                   PyValueEx (8102 :: Int))
           , (hvMigrationBandwidth,              PyValueEx (32 :: Int))
           , (hvMigrationDowntime,               PyValueEx (30 :: Int))
+          , (hvMigrationDowntimeMax,            PyValueEx (0 :: Int))
+          , (hvMigrationCancelThreshold,        PyValueEx (0 :: Int))
           , (hvMigrationMode,                   PyValueEx htMigrationLive)
           , (hvUseGuestAgent,                   PyValueEx False)
           , (hvUseLocaltime,                    PyValueEx False)

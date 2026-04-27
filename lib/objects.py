@@ -2319,6 +2319,7 @@ class MigrationStatus(ConfigObject):
     "total_ram",
     # to signal, if migration has switched to postcopy
     "postcopy_status",
+    "migration_downtime",
     ]
 
 
