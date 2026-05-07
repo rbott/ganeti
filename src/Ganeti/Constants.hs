@@ -4097,8 +4097,13 @@ hvcDefaults =
              , (hvVncBindAddress, PyValueEx ip4AddressAny)
              , (hvAcpi,           PyValueEx True)
              , (hvPae,            PyValueEx True)
-             , (hvKernelPath,     PyValueEx "/usr/lib/xen/boot/hvmloader")
-             , (hvDeviceModel,    PyValueEx "/usr/lib/xen/bin/qemu-dm")
+             -- Deprecated for xen-hvm on libxl >= 4.10: hvmloader and the
+             -- qemu-xen device model are auto-resolved. Defaults are empty
+             -- so fresh clusters do not carry stale paths; existing values
+             -- are still accepted (and ignored at start time, with a
+             -- deprecation warning) for upgrade compatibility.
+             , (hvKernelPath,     PyValueEx "")
+             , (hvDeviceModel,    PyValueEx "")
              , (hvMigrationPort,  PyValueEx (8002 :: Int))
              , (hvMigrationMode,  PyValueEx htMigrationNonlive)
              , (hvUseLocaltime,   PyValueEx False)

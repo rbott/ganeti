@@ -137,9 +137,9 @@ Installing The Hypervisor
 
 While Ganeti is developed with the ability to modularly run on different
 virtualization environments in mind the only two currently useable on a
-live system are Xen (both in PVM and HVM mode) and KVM. Supported Xen
-versions are: 3.0.3 and later 3.x versions, and 4.x (tested up to 4.1).
-Supported KVM versions are 72 and above.
+live system are Xen (both in PVM and HVM mode) and KVM. Xen 4.10 or later
+is required; older Xen versions and the legacy ``xm`` toolstack are no
+longer supported. Supported KVM versions are 72 and above.
 
 Please follow your distribution's recommended way to install and set up
 Xen, or install Xen from the upstream source, if you wish, following
@@ -190,6 +190,16 @@ a symlink from your actual kernel to ``/boot/vmlinuz-3-xenU``, and one
 from your initrd to ``/boot/initrd-3-xenU`` [#defkernel]_. Note that
 if you don't use an initrd for the domU kernel, you don't need to create
 the initrd symlink.
+
+.. note::
+
+   The xen-hvm hypervisor parameters ``kernel_path`` and ``device_model``
+   are deprecated and ignored on Xen 4.10+ / libxl: hvmloader and the
+   qemu-xen device model are auto-resolved by libxl. Do not pass these
+   on ``gnt-cluster init --hypervisor-parameters xen-hvm:...``; they
+   default to empty. Existing values from older Ganeti versions are kept
+   for upgrade compatibility but no longer take effect; ``cfgupgrade``
+   resets values matching the historical defaults to empty.
 
 .. _configure-lvm-label:
 

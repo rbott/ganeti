@@ -22,7 +22,7 @@ Software Requirements
 
 Before installing, please verify that you have the following programs:
 
-- `Xen Hypervisor <http://www.xen.org/>`_, version 3.0 or above, if
+- `Xen Hypervisor <http://www.xen.org/>`_, version 4.10 or above, if
   running on Xen
 - `KVM Hypervisor <http://www.linux-kvm.org>`_, version 2.12 or above
 - `DRBD <http://www.drbd.org/>`_, kernel module and userspace utils,

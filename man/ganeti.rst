@@ -22,9 +22,9 @@ DESCRIPTION
 -----------
 
 The Ganeti software manages physical nodes and virtual instances of a
-cluster based on a virtualization software. The current version (2.3)
-supports Xen 3.x and KVM (72 or above) as hypervisors, and LXC as an
-experimental hypervisor.
+cluster based on a virtualization software. It supports Xen 4.10 or later
+and KVM (72 or above) as hypervisors, and LXC as an experimental
+hypervisor.
 
 Quick start
 -----------

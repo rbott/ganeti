@@ -382,8 +382,7 @@ def _ParseNodeInfo(info):
 
     (key, val) = [s.strip() for s in fields]
 
-    # Note: in Xen 3, memory has changed to total_memory
-    if key in ("memory", "total_memory"):
+    if key == "total_memory":
       memory_total = int(val)
     elif key == "free_memory":
       memory_free = int(val)
@@ -1531,8 +1530,12 @@ class XenHvmHypervisor(XenHypervisor):
     constants.HV_VNC_BIND_ADDRESS:
       (False, netutils.IP4Address.IsValid,
        "VNC bind address is not a valid IP address", None, None),
-    constants.HV_KERNEL_PATH: hv_base.REQ_FILE_CHECK,
-    constants.HV_DEVICE_MODEL: hv_base.REQ_FILE_CHECK,
+    # HV_KERNEL_PATH and HV_DEVICE_MODEL are deprecated for xen-hvm: libxl
+    # >= 4.10 auto-resolves both. Keep them as optional for upgrade
+    # compatibility (existing configs may still carry legacy paths) but no
+    # longer require the files to exist.
+    constants.HV_KERNEL_PATH: hv_base.OPT_FILE_CHECK,
+    constants.HV_DEVICE_MODEL: hv_base.OPT_FILE_CHECK,
     constants.HV_VNC_PASSWORD_FILE: hv_base.REQ_FILE_CHECK,
     constants.HV_MIGRATION_PORT: hv_base.REQ_NET_PORT_CHECK,
     constants.HV_MIGRATION_MODE: hv_base.MIGRATION_MODE_CHECK,
@@ -1556,16 +1559,30 @@ class XenHvmHypervisor(XenHypervisor):
     }
 
   def _GetConfig(self, instance, startup_memory, block_devices):
-    """Create a Xen 3.1 HVM config file.
+    """Create a Xen HVM config file.
 
     """
     hvp = instance.hvparams
 
     config = StringIO()
 
-    # kernel handling
-    kpath = hvp[constants.HV_KERNEL_PATH]
-    config.write("kernel = '%s'\n" % kpath)
+    # The legacy "kernel" and "device_model" HVM directives have no modern
+    # equivalent: libxl >= 4.10 auto-resolves both hvmloader and the qemu-xen
+    # device model from its compiled-in paths. firmware_override is *not* the
+    # replacement for kernel_path -- it is for BIOS firmware blobs (SeaBIOS,
+    # OVMF), and feeding it an hvmloader path causes qemu-xen to crash with
+    # rc=-26. We therefore ignore HV_KERNEL_PATH and HV_DEVICE_MODEL entirely
+    # for HVM and only warn when the operator left non-empty values behind.
+    if hvp[constants.HV_KERNEL_PATH]:
+      logging.warning("hvparam 'kernel_path' is deprecated for xen-hvm and is"
+                      " ignored on libxl >= 4.10; clear it with"
+                      " 'gnt-cluster modify -H xen-hvm:kernel_path=' (or the"
+                      " per-instance equivalent) to silence this warning")
+    if hvp[constants.HV_DEVICE_MODEL]:
+      logging.warning("hvparam 'device_model' is deprecated for xen-hvm and is"
+                      " ignored on libxl >= 4.10; clear it with"
+                      " 'gnt-cluster modify -H xen-hvm:device_model=' (or the"
+                      " per-instance equivalent) to silence this warning")
 
     config.write("builder = 'hvm'\n")
     config.write("memory = %d\n" % startup_memory)
@@ -1596,7 +1613,10 @@ class XenHvmHypervisor(XenHypervisor):
       config.write("viridian = 0\n")
 
     config.write("apic = 1\n")
-    config.write("device_model = '%s'\n" % hvp[constants.HV_DEVICE_MODEL])
+    # qemu-xen requires stdvga; the default (cirrus) causes libxl to abort
+    # post-config with LIBXL_ERROR_VGA_INTERFACE_NOT_STANDARD.
+    config.write("device_model_version = 'qemu-xen'\n")
+    config.write("vga = 'stdvga'\n")
     config.write("boot = '%s'\n" % hvp[constants.HV_BOOT_ORDER])
     config.write("sdl = 0\n")
     config.write("usb = 1\n")

@@ -365,6 +365,50 @@ class CfgUpgrade(object):
         cluster["hvparams"][constants.HT_KVM][constants.HV_DISK_DISCARD] = \
           constants.HT_DISCARD_IGNORE
 
+      # xen-hvm: kernel_path and device_model are deprecated. libxl >= 4.10
+      # auto-resolves hvmloader and qemu-xen; the legacy paths are no longer
+      # honoured. Reset values that match the historical defaults; leave
+      # custom values alone (ignored at start time, with a warning).
+      if constants.HT_XEN_HVM in cluster["hvparams"]:
+        self._ResetDeprecatedXenHvmParams(
+            cluster["hvparams"][constants.HT_XEN_HVM],
+            scope="cluster")
+
+  @staticmethod
+  def _ResetDeprecatedXenHvmParams(hvparams, scope):
+    """Clear legacy xen-hvm kernel_path/device_model values in-place.
+
+    @param hvparams: the hvparams dict for HT_XEN_HVM (cluster-level or
+        per-instance)
+    @param scope: human-readable scope for log messages
+
+    """
+    legacy_kernel_paths = frozenset([
+        "/usr/lib/xen/boot/hvmloader",
+        "/usr/lib/xen-default/boot/hvmloader",
+        ])
+    legacy_device_models = frozenset([
+        "/usr/lib/xen/bin/qemu-dm",
+        "/usr/lib/xen-default/bin/qemu-dm",
+        ])
+    for (key, legacy_values) in [
+        (constants.HV_KERNEL_PATH, legacy_kernel_paths),
+        (constants.HV_DEVICE_MODEL, legacy_device_models),
+        ]:
+      if key not in hvparams:
+        continue
+      value = hvparams[key]
+      if value in legacy_values:
+        hvparams[key] = ""
+        logging.info("xen-hvm '%s' on %s reset from legacy default '%s' to"
+                     " empty (now auto-resolved by libxl)",
+                     key, scope, value)
+      elif value:
+        logging.warning("xen-hvm '%s' on %s is set to '%s'; this hvparam is"
+                        " deprecated and ignored for HVM on libxl >= 4.10."
+                        " Consider clearing it.",
+                        key, scope, value)
+
   @OrFail("Upgrading groups")
   def UpgradeGroups(self):
     cl_ipolicy = self.config_data["cluster"].get("ipolicy")
@@ -487,6 +531,14 @@ class CfgUpgrade(object):
             constants.HT_DISCARD_IGNORE
           logging.info("disk_discard was explicitly set to 'default' on "
                        "instance '%s': migrated to 'ignore'" % iobj["name"])
+
+      # xen-hvm kernel_path/device_model: see UpgradeCluster for context.
+      # Per-instance hvparams may override the cluster-level value, so apply
+      # the same reset here.
+      if "hvparams" in iobj and iobj.get("hypervisor") == constants.HT_XEN_HVM:
+        self._ResetDeprecatedXenHvmParams(
+            iobj["hvparams"],
+            scope="instance %s" % iobj.get("name", instance))
 
     if self.GetExclusiveStorageValue() and missing_spindles:
       # We cannot be sure that the instances that are missing spindles have
@@ -761,6 +813,16 @@ class CfgUpgrade(object):
     for variant in variants:
       if variant in hvparams:
         hvparams[variant]["xen_cmd"] = "xl"
+
+    # Older Ganeti versions validate xen-hvm kernel_path and device_model as
+    # mandatory file paths. Refill them with the historical defaults when
+    # downgrading so the older code does not refuse the config.
+    if constants.HT_XEN_HVM in hvparams:
+      hvm = hvparams[constants.HT_XEN_HVM]
+      if not hvm.get(constants.HV_KERNEL_PATH):
+        hvm[constants.HV_KERNEL_PATH] = "/usr/lib/xen/boot/hvmloader"
+      if not hvm.get(constants.HV_DEVICE_MODEL):
+        hvm[constants.HV_DEVICE_MODEL] = "/usr/lib/xen/bin/qemu-dm"
 
   @OrFail("Removing the rbd/user-id parameter")
   def DowngradeRbdUserId(self):
