@@ -2041,6 +2041,7 @@ python_tests_legacy = \
 python_tests_unit = \
 	test/py/unit/cmdlib/test_instance_storage_drbd_wait.py \
 	test/py/unit/confd/test_client.py \
+	test/py/unit/test_backend_filestorage.py \
 	test/py/unit/test_daemon.py \
 	test/py/unit/hypervisor/hv_kvm/test_monitor.py \
 	test/py/unit/hypervisor/hv_kvm/test_bus_manager.py \

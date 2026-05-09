@@ -4721,16 +4721,18 @@ def CreateFileStorageDir(file_storage_dir):
 
   """
   file_storage_dir = _TransformFileStorageDir(file_storage_dir)
-  if os.path.exists(file_storage_dir):
-    if not os.path.isdir(file_storage_dir):
-      _Fail("Specified storage dir '%s' is not a directory",
-            file_storage_dir)
-  else:
-    try:
-      os.makedirs(file_storage_dir, 0o750)
-    except OSError as err:
-      _Fail("Cannot create file storage directory '%s': %s",
-            file_storage_dir, err, exc=True)
+  # Avoid a TOCTOU race against the underlying filesystem: on NFS the local
+  # attribute cache can disagree with the server about whether the directory
+  # exists, so a pre-check with os.path.exists() may be wrong. Always attempt
+  # the mkdir and treat EEXIST as success when the path is in fact a directory.
+  try:
+    os.makedirs(file_storage_dir, 0o750, exist_ok=True)
+  except FileExistsError:
+    _Fail("Specified storage dir '%s' is not a directory",
+          file_storage_dir)
+  except OSError as err:
+    _Fail("Cannot create file storage directory '%s': %s",
+          file_storage_dir, err, exc=True)
 
 
 def RemoveFileStorageDir(file_storage_dir):
@@ -4746,16 +4748,20 @@ def RemoveFileStorageDir(file_storage_dir):
 
   """
   file_storage_dir = _TransformFileStorageDir(file_storage_dir)
-  if os.path.exists(file_storage_dir):
-    if not os.path.isdir(file_storage_dir):
-      _Fail("Specified Storage directory '%s' is not a directory",
-            file_storage_dir)
-    # deletes dir only if empty, otherwise we want to fail the rpc call
-    try:
-      os.rmdir(file_storage_dir)
-    except OSError as err:
-      _Fail("Cannot remove file storage directory '%s': %s",
-            file_storage_dir, err)
+  # Avoid a TOCTOU race against the underlying filesystem: on NFS a stale
+  # negative attribute cache can make os.path.exists() return False for a
+  # directory that still exists on the server, causing the rmdir to be
+  # silently skipped. Always attempt the rmdir and treat ENOENT as success.
+  try:
+    os.rmdir(file_storage_dir)
+  except FileNotFoundError:
+    pass
+  except NotADirectoryError:
+    _Fail("Specified Storage directory '%s' is not a directory",
+          file_storage_dir)
+  except OSError as err:
+    _Fail("Cannot remove file storage directory '%s': %s",
+          file_storage_dir, err)
 
 
 def RenameFileStorageDir(old_file_storage_dir, new_file_storage_dir):
