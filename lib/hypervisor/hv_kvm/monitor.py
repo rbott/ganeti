@@ -350,9 +350,21 @@ class QmpConnection(QemuMonitorSocket):
 
   """
   _QMP_TIMEOUT = 5
-  # On q35 the guest's pciehp driver mediates detach; 30 s covers driver
-  # release and BAR deallocation on a loaded 1-vcpu guest.
-  _HOT_UNPLUG_EVENT_TIMEOUT = 30
+  # Time to wait for the guest to acknowledge a hot-unplug (DEVICE_DELETED)
+  # after each device_del. The detach is mediated asynchronously by the
+  # guest's PCI hotplug driver (acpiphp on the default pc/i440fx machine,
+  # pciehp on q35), which must release the device before QEMU emits the
+  # event.
+  _HOT_UNPLUG_EVENT_TIMEOUT = 15
+  # Number of times to re-issue device_del if the unplug is not
+  # acknowledged within _HOT_UNPLUG_EVENT_TIMEOUT. A device that was only
+  # just hot-added can be in a state where the guest silently drops the
+  # first eject request (the hot-add has not finished settling), so
+  # DEVICE_DELETED never arrives no matter how long we wait - observed on
+  # Debian Bookworm (linux 6.1 / qemu 7.2). Re-issuing device_del re-arms
+  # the guest-side eject. Overall budget is
+  # (_HOT_UNPLUG_RETRIES + 1) * _HOT_UNPLUG_EVENT_TIMEOUT seconds.
+  _HOT_UNPLUG_RETRIES = 1
   # Mirrors _HOT_UNPLUG_EVENT_TIMEOUT for the hot-add side. After
   # device_add succeeds on q35, the guest's pciehp must online the slot
   # and assign BAR addresses before any follow-up operation (in
@@ -532,32 +544,76 @@ class QmpConnection(QemuMonitorSocket):
         })
     self.execute_qmp("device_add", arguments)
 
+  def _UnplugAndWait(self, devid):
+    """Issue device_del and wait for the guest to acknowledge the unplug.
+
+    The detach is mediated asynchronously by the guest's PCI hotplug
+    driver (acpiphp on the default pc/i440fx machine, pciehp on q35),
+    which must release the device before QEMU emits DEVICE_DELETED. A
+    freshly hot-added device can silently drop the first eject request
+    while the hot-add is still settling, in which case no event ever
+    arrives; re-issuing device_del re-arms the guest-side eject. We
+    therefore send device_del up to C{_HOT_UNPLUG_RETRIES} extra times,
+    waiting C{_HOT_UNPLUG_EVENT_TIMEOUT} seconds for an acknowledgement
+    after each.
+
+    Callers must only run the backend teardown (netdev_del/blockdev-del)
+    after this returns: doing so while the frontend is still live makes
+    QEMU error out.
+
+    @type devid: string
+    @param devid: the qdev id of the device to unplug
+    @raise errors.HypervisorError: if the unplug is not acknowledged
+        within the overall budget, or the guest reports an unplug error
+
+    """
+    for attempt in range(self._HOT_UNPLUG_RETRIES + 1):
+      try:
+        self.execute_qmp("device_del", {"id": devid})
+      except errors.HypervisorError:
+        if attempt == 0:
+          raise
+        # The device accepted device_del on the first attempt but is gone
+        # now: its eject was acknowledged just after the previous wait
+        # timed out, so this re-issued device_del hits a device that no
+        # longer exists. The unplug succeeded.
+        logging.info("Re-issued device_del for %s failed; device already"
+                     " removed, treating hot-unplug as done", devid)
+        return
+
+      event = self.wait_for_qmp_event(
+        ["DEVICE_DELETED", "DEVICE_UNPLUG_GUEST_ERROR"],
+        self._HOT_UNPLUG_EVENT_TIMEOUT)
+      if event is not None:
+        if event.event_type == "DEVICE_UNPLUG_GUEST_ERROR":
+          raise errors.HypervisorError(
+            f"DEVICE_UNPLUG_GUEST_ERROR event occurred for {devid}")
+        return
+
+      if attempt < self._HOT_UNPLUG_RETRIES:
+        logging.warning("Hot-unplug of %s not acknowledged within %ss;"
+                        " re-issuing device_del to re-arm the guest eject",
+                        devid, self._HOT_UNPLUG_EVENT_TIMEOUT)
+
+    total = self._HOT_UNPLUG_EVENT_TIMEOUT * (self._HOT_UNPLUG_RETRIES + 1)
+    raise errors.HypervisorError(
+      f"Hot-unplug of {devid} not acknowledged by guest within {total}s"
+      f" ({self._HOT_UNPLUG_RETRIES + 1} attempts). The guest's PCI"
+      " hotplug driver must release the device before QEMU can remove it:"
+      " acpiphp on the default pc/i440fx machine, pciehp on q35. Verify"
+      " the guest's kernel has the matching hotplug driver"
+      " (CONFIG_HOTPLUG_PCI_ACPI / CONFIG_HOTPLUG_PCI_PCIE) and is"
+      " responsive.")
+
   @_ensure_connection
   def HotDelNic(self, devid):
     """Hot-del a NIC
 
-    Issues device_del, then waits for DEVICE_DELETED before removing the
-    netdev backend.  On q35/PCIe the guest's pciehp driver must release
-    the device before QEMU can detach it; netdev_del must not run until
-    then or QEMU will error on a still-live frontend.
+    Waits for the guest to acknowledge the unplug (see L{_UnplugAndWait})
+    before removing the netdev backend.
 
     """
-    self.execute_qmp("device_del", {"id": devid})
-
-    event = self.wait_for_qmp_event(
-      ["DEVICE_DELETED", "DEVICE_UNPLUG_GUEST_ERROR"],
-      self._HOT_UNPLUG_EVENT_TIMEOUT)
-    if event is None:
-      raise errors.HypervisorError(
-        f"Hot-unplug of {devid} not acknowledged by guest within"
-        f" {self._HOT_UNPLUG_EVENT_TIMEOUT}s. On q35 the guest's PCIe"
-        " hotplug driver (pciehp) must release the device before QEMU"
-        " can remove it. Verify the guest's kernel has"
-        " CONFIG_HOTPLUG_PCI_PCIE and is responsive.")
-    elif event.event_type == "DEVICE_UNPLUG_GUEST_ERROR":
-      raise errors.HypervisorError(
-        f"DEVICE_UNPLUG_GUEST_ERROR event occurred for {devid}")
-
+    self._UnplugAndWait(devid)
     self.execute_qmp("netdev_del", {"id": devid})
 
   @_ensure_connection
@@ -601,23 +657,11 @@ class QmpConnection(QemuMonitorSocket):
   def HotDelDisk(self, devid):
     """Hot-del a Disk
 
+    Waits for the guest to acknowledge the unplug (see L{_UnplugAndWait})
+    before removing the block backend.
+
     """
-    self.execute_qmp("device_del", {"id": devid})
-
-    event = self.wait_for_qmp_event(
-      ["DEVICE_DELETED", "DEVICE_UNPLUG_GUEST_ERROR"],
-      self._HOT_UNPLUG_EVENT_TIMEOUT)
-    if event is None:
-      raise errors.HypervisorError(
-        f"Hot-unplug of {devid} not acknowledged by guest within"
-        f" {self._HOT_UNPLUG_EVENT_TIMEOUT}s. On q35 the guest's PCIe"
-        " hotplug driver (pciehp) must release the device before QEMU"
-        " can remove it. Verify the guest's kernel has"
-        " CONFIG_HOTPLUG_PCI_PCIE and is responsive.")
-    elif event.event_type == "DEVICE_UNPLUG_GUEST_ERROR":
-      raise errors.HypervisorError(
-        f"DEVICE_UNPLUG_GUEST_ERROR event occurred for {devid}")
-
+    self._UnplugAndWait(devid)
     self.execute_qmp("blockdev-del", {"node-name": devid})
 
   def _GetPCIDevices(self):
@@ -740,10 +784,11 @@ class QmpConnection(QemuMonitorSocket):
       if time.monotonic() >= deadline:
         raise errors.HypervisorError(
           f"Guest did not claim hot-added device {devid} within"
-          f" {timeout}s. On q35 the guest's PCIe hotplug driver"
-          " (pciehp) must bring the device online before it is usable."
-          " Verify the guest's kernel has CONFIG_HOTPLUG_PCI_PCIE"
-          " enabled and is responsive.")
+          f" {timeout}s. The guest's PCI hotplug driver must bring the"
+          " device online before it is usable (acpiphp on the default"
+          " pc/i440fx machine, pciehp on q35). Verify the guest's kernel"
+          " has the matching hotplug driver (CONFIG_HOTPLUG_PCI_ACPI /"
+          " CONFIG_HOTPLUG_PCI_PCIE) enabled and is responsive.")
       time.sleep(self._HOT_PLUG_CLAIM_POLL_INTERVAL)
 
   def _GetBlockDevices(self):

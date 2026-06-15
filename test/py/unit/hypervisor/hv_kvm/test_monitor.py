@@ -346,9 +346,11 @@ class TestHasPCIDevice:
 
 
 # -----------------------------------------------------------------------------
-# HotDelNic must wait for DEVICE_DELETED before issuing netdev_del.
-# On q35/PCIe the guest's pciehp driver mediates detach asynchronously;
-# netdev_del before the event causes a QEMU error.
+# HotDelNic must wait for DEVICE_DELETED before issuing netdev_del: the guest's
+# PCI hotplug driver (acpiphp on pc/i440fx, pciehp on q35) mediates detach
+# asynchronously, and netdev_del before the event causes a QEMU error. A
+# freshly hot-added device can silently drop the first eject request, so
+# device_del is re-issued once (_HOT_UNPLUG_RETRIES) to re-arm the guest eject.
 # -----------------------------------------------------------------------------
 class TestHotDelNic:
   """Unit tests for the event-based hot-unplug path in HotDelNic."""
@@ -422,6 +424,77 @@ class TestHotDelNic:
                         lambda types, timeout: None)
 
     with pytest.raises(errors.HypervisorError):
+      qmp.HotDelNic("nic-abc123")
+
+    assert "netdev_del" not in calls
+
+  def test_device_del_reissued_on_timeout(self, monkeypatch):
+    # The overall budget is exhausted only after device_del has been
+    # re-issued _HOT_UNPLUG_RETRIES times (one extra here).
+    qmp = self._qmp(monkeypatch)
+    calls = []
+    monkeypatch.setattr(qmp, "execute_qmp",
+                        lambda cmd, args=None: calls.append(cmd))
+    monkeypatch.setattr(qmp, "wait_for_qmp_event",
+                        lambda types, timeout: None)
+
+    with pytest.raises(errors.HypervisorError):
+      qmp.HotDelNic("nic-abc123")
+
+    assert calls.count("device_del") == qmp._HOT_UNPLUG_RETRIES + 1
+
+  def test_reissued_device_del_recovers_unplug(self, monkeypatch):
+    # First wait times out; the re-issued device_del is acknowledged, so
+    # the unplug succeeds and netdev_del runs.
+    qmp = self._qmp(monkeypatch)
+    calls = []
+    monkeypatch.setattr(qmp, "execute_qmp",
+                        lambda cmd, args=None: calls.append(cmd))
+    events = [None, self._make_event("DEVICE_DELETED")]
+    monkeypatch.setattr(qmp, "wait_for_qmp_event",
+                        lambda types, timeout: events.pop(0))
+
+    qmp.HotDelNic("nic-abc123")
+
+    assert calls == ["device_del", "device_del", "netdev_del"]
+
+  def test_reissued_device_del_failure_treated_as_success(self, monkeypatch):
+    # The eject is acknowledged just after the first wait times out, so
+    # the re-issued device_del hits an already-gone device and errors.
+    # That must be treated as a successful unplug (netdev_del still runs).
+    qmp = self._qmp(monkeypatch)
+    calls = []
+
+    def fake_execute(cmd, args=None):
+      calls.append(cmd)
+      if cmd == "device_del" and calls.count("device_del") == 2:
+        raise errors.HypervisorError("kvm: error executing the device_del"
+                                     " command: ... (DeviceNotFound):")
+
+    monkeypatch.setattr(qmp, "execute_qmp", fake_execute)
+    monkeypatch.setattr(qmp, "wait_for_qmp_event",
+                        lambda types, timeout: None)
+
+    qmp.HotDelNic("nic-abc123")
+
+    assert calls == ["device_del", "device_del", "netdev_del"]
+
+  def test_first_device_del_failure_propagates(self, monkeypatch):
+    # A failure of the very first device_del is a real error: the device
+    # should still be present, so it must propagate and netdev_del must
+    # not run.
+    qmp = self._qmp(monkeypatch)
+    calls = []
+
+    def fake_execute(cmd, args=None):
+      calls.append(cmd)
+      raise errors.HypervisorError("boom")
+
+    monkeypatch.setattr(qmp, "execute_qmp", fake_execute)
+    monkeypatch.setattr(qmp, "wait_for_qmp_event",
+                        lambda types, timeout: None)
+
+    with pytest.raises(errors.HypervisorError, match="boom"):
       qmp.HotDelNic("nic-abc123")
 
     assert "netdev_del" not in calls
