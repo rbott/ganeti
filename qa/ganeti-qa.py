@@ -968,6 +968,102 @@ def RunInstanceTestsReduced(create_fun, inodes):
   qa_cluster.AssertClusterVerify()
 
 
+def RunUefiInstanceTests():
+  """Tests for UEFI (boot_type=uefi) instances.
+
+  All UEFI tests operate on stopped instances: the standard QA setup
+  boots instances via direct-kernel boot with an initrd handling ACPI
+  shutdown events, which does not work under UEFI (there is no easily
+  bootable UEFI OS image), and booting would make every shutdown time
+  out. The tests therefore cover the config-side surface, the
+  firmware-disk guards and the stopped-instance movement paths
+  (failover, cold move, template conversion). The OVMF code/vars
+  templates must exist on the nodes (they are seeded node-side at
+  firmware disk creation).
+
+  """
+  if constants.HT_KVM not in qa_config.GetEnabledHypervisors():
+    ReportTestSkip("UEFI instance tests", "kvm hypervisor")
+    return
+  if not qa_config.TestEnabled("instance-add-uefi-offline"):
+    ReportTestSkip("UEFI instance tests", "instance-add-uefi-offline")
+    return
+
+  requested_conversions = qa_config.get("convert-disk-templates", [])
+  supported_conversions = \
+      set(requested_conversions).difference(constants.DTS_NOT_CONVERTIBLE_TO)
+
+  # Prefer DRBD (exercises the mirrored firmware disk on failover);
+  # fall back to plain if DRBD is not available.
+  if qa_config.TestEnabled("instance-add-drbd-disk") and \
+      qa_config.IsTemplateSupported(constants.DT_DRBD8):
+    uefi_template = constants.DT_DRBD8
+  elif qa_config.IsTemplateSupported(constants.DT_PLAIN):
+    uefi_template = constants.DT_PLAIN
+  else:
+    ReportTestSkip("UEFI instance tests", "plain or drbd disk template")
+    return
+
+  if uefi_template == constants.DT_DRBD8:
+    inodes = qa_config.AcquireManyNodes(2)
+  else:
+    inodes = qa_config.AcquireManyNodes(1)
+
+  try:
+    instance = RunTest(qa_instance.TestUefiInstanceAdd, inodes,
+                       uefi_template)
+    try:
+      RunTest(qa_instance.TestUefiInstanceGuards, instance)
+
+      if qa_config.TestEnabled("instance-convert-disk"):
+        RunTest(qa_instance.TestUefiInstanceConvertDiskTemplate, instance,
+                supported_conversions)
+
+      if qa_config.TestEnabled("instance-failover"):
+        RunTest(qa_instance.TestUefiInstanceFailover, instance)
+
+      if uefi_template in constants.DTS_COPYABLE:
+        # Cold move for copyable templates; needs a free node to
+        # move to.
+        try:
+          newnode = qa_config.AcquireNode(exclude=inodes)
+        except qa_error.OutOfNodesError:
+          print(qa_utils.FormatInfo("Not enough nodes for the UEFI move"
+                                    " test, skipping it"))
+        else:
+          try:
+            RunTest(qa_instance.TestUefiInstanceMove, instance, newnode)
+          finally:
+            newnode.Release()
+
+      RunTest(qa_instance.TestInstanceRemove, instance)
+    finally:
+      instance.Release()
+  finally:
+    qa_config.ReleaseManyNodes(inodes)
+
+  # Cluster-level default flip: needs its own stopped instance
+  # without an instance-level boot_type override.
+  if qa_config.TestEnabled("cluster-modify") and \
+      qa_config.IsTemplateSupported(constants.DT_PLAIN):
+    pnode = qa_config.AcquireNode()
+    try:
+      plain_instance = qa_instance.TestInstanceAddWithPlainDisk([pnode])
+      if plain_instance is None:
+        raise qa_error.Error("Could not create plain instance for the"
+                             " cluster-modify boot_type test")
+      try:
+        RunTest(qa_instance.TestInstanceShutdown, plain_instance)
+        RunTest(qa_cluster.TestClusterModifyBootType, plain_instance)
+        RunTest(qa_instance.TestInstanceRemove, plain_instance)
+      finally:
+        plain_instance.Release()
+    finally:
+      pnode.Release()
+
+  qa_cluster.AssertClusterVerify()
+
+
 def RunMonitoringTests():
   RunTestIf("mon-collector", qa_monitoring.TestInstStatusCollector)
 
@@ -1105,6 +1201,8 @@ def RunQa():
       oldconf = setup_conf_f()
       RunTestBlock(RunInstanceTests)
       restore_conf_f(oldconf)
+
+  RunTestBlock(RunUefiInstanceTests)
 
   pnode = qa_config.AcquireNode()
   try:

@@ -40,8 +40,8 @@ import yaml
 from ganeti import utils
 from ganeti import constants
 from ganeti import pathutils
+from ganeti.utils import retry
 from ganeti import query
-from ganeti.netutils import IP4Address
 
 from qa import qa_config
 from qa import qa_daemon
@@ -102,14 +102,16 @@ def GetInstanceInfo(instance):
 
   re_drbdnode = re.compile(r"^([^\s,]+),\s+minor=([0-9]+)$")
   vols = []
+  vols_per_disk = [] # volume IDs of each disk, parallel to info["Disks"]
   drbd_min = {}
   dtypes = []
   for (count, diskinfo) in enumerate(info["Disks"]):
     (dtype, _) = diskinfo["disk/%s" % count].split(",", 1)
     dtypes.append(dtype)
+    disk_vols = []
     if dtype == constants.DT_DRBD8:
       for child in diskinfo["child devices"]:
-        vols.append(child["logical_id"])
+        disk_vols.append(child["logical_id"])
       for key in ["nodeA", "nodeB"]:
         m = re_drbdnode.match(diskinfo[key])
         if not m:
@@ -119,7 +121,9 @@ def GetInstanceInfo(instance):
         minorlist = drbd_min.setdefault(node, [])
         minorlist.append(minor)
     elif dtype == constants.DT_PLAIN:
-      vols.append(diskinfo["logical_id"])
+      disk_vols.append(diskinfo["logical_id"])
+    vols.extend(disk_vols)
+    vols_per_disk.append(disk_vols)
 
   # TODO remove and modify calling sites
   disk_template = utils.GetDiskTemplateString(dtypes)
@@ -142,6 +146,7 @@ def GetInstanceInfo(instance):
   return {
     "nodes": nodes,
     "volumes": vols,
+    "volumes-per-disk": vols_per_disk,
     "drbd-minors": drbd_min,
     "disk-template": disk_template,
     "storage-type": storage_type,
@@ -149,19 +154,29 @@ def GetInstanceInfo(instance):
     }
 
 
-def _DestroyInstanceDisks(instance):
+def _DestroyInstanceDisks(instance, skip_firmware=False):
   """Remove all the backend disks of an instance.
 
   This is used to simulate HW errors (dead nodes, broken disks...); the
   configuration of the instance is not affected.
   @type instance: dictionary
   @param instance: the instance
+  @type skip_firmware: bool
+  @param skip_firmware: if True, spare the firmware (OVMF) disk, which
+      holds the precious NVRAM and is never recreated by recreate-disks
+      (only used for LVM-backed instances)
 
   """
   info = GetInstanceInfo(instance.name)
   # FIXME: destruction/removal should be part of the disk class
   if info["storage-type"] == constants.ST_LVM_VG:
-    vols = info["volumes"]
+    if skip_firmware:
+      fw_idx = _GetInstanceDiskRoles(instance).index(
+        constants.DR_ROLE_FIRMWARE)
+      vols = [v for (idx, disk_vols) in enumerate(info["volumes-per-disk"])
+              if idx != fw_idx for v in disk_vols]
+    else:
+      vols = info["volumes"]
     for node in info["nodes"]:
       AssertCommand(["lvremove", "-f"] + vols, node=node)
   elif info["storage-type"] in (constants.ST_FILE, constants.ST_SHARED_FILE):
@@ -662,6 +677,15 @@ def TestInstanceModify(instance):
     args.extend([
       ["-H", "%s=%s" % (constants.HV_KERNEL_PATH, test_kernel)],
       ["-H", "%s=%s" % (constants.HV_KERNEL_PATH, constants.VALUE_DEFAULT)],
+      # boot_type is the single source of truth for the KVM boot mode;
+      # bios/direct_kernel are pure config changes (no disk lifecycle,
+      # no firmware disk), valid while the instance is running. uefi is
+      # covered by the dedicated instance-add-uefi-offline tests instead.
+      ["-H", "%s=%s" % (constants.HV_BOOT_TYPE,
+                        constants.HT_BOOT_BIOS)],
+      ["-H", "%s=%s" % (constants.HV_BOOT_TYPE,
+                        constants.HT_BOOT_DIRECT_KERNEL)],
+      ["-H", "%s=%s" % (constants.HV_BOOT_TYPE, constants.VALUE_DEFAULT)],
       ])
 
   if default_hv == constants.HT_XEN_PVM:
@@ -695,6 +719,14 @@ def TestInstanceModify(instance):
 
   for alist in args:
     AssertCommand(["gnt-instance", "modify"] + alist + [instance.name])
+
+
+  if default_hv == constants.HT_KVM:
+    # An invalid boot_type value must be rejected outright (no disk
+    # lifecycle side effects possible from an invalid value).
+    AssertCommand(["gnt-instance", "modify", "-H",
+                   "%s=invalid-boot-type" % constants.HV_BOOT_TYPE,
+                   instance.name], fail=True)
 
   # check no-modify
   AssertCommand(["gnt-instance", "modify", instance.name], fail=True)
@@ -1641,3 +1673,313 @@ available_instance_tests = [
   ("instance-add-gluster", constants.DT_GLUSTER,
    TestInstanceAddGluster, 1),
   ]
+
+
+def _GetInstanceDiskRoles(instance):
+  """Return the list of disk roles of the given instance.
+
+  @type instance: string or instance object
+  @param instance: the instance to query
+  @rtype: list of string
+  @return: one role string ("data" or "firmware") per disk, in disk order
+
+  """
+  name = instance if isinstance(instance, str) else instance.name
+  cmd = utils.ShellQuoteArgs(["gnt-instance", "list", "--no-headers",
+                              "--separator=:", "-o", "disk.roles", name])
+  out = qa_utils.GetCommandOutput(qa_config.GetMasterNode().primary, cmd)
+  # A list-valued field is rendered as a comma-joined string
+  return [v.strip() for v in out.strip().split(",") if v.strip()]
+
+
+def _GetFirmwareDiskIdx(instance):
+  """Return the index of the instance's firmware disk.
+
+  @raise qa_error.Error: if the instance has no firmware disk
+
+  """
+  roles = _GetInstanceDiskRoles(instance)
+  try:
+    return roles.index(constants.DR_ROLE_FIRMWARE)
+  except ValueError:
+    name = instance if isinstance(instance, str) else instance.name
+    raise qa_error.Error("Instance %s has no firmware disk (roles: %s)"
+                         % (name, roles))
+
+
+def _AssertUefiFirmwareDisk(instance):
+  """Raise L{retry.RetryAgain} unless the instance has exactly one
+  firmware disk.
+
+  Poll-friendly: usable inside L{ganeti.utils.retry.Retry} to wait for
+  an asynchronously created firmware disk (e.g. the follow-up jobs of
+  'gnt-cluster modify -H kvm:boot_type=uefi --force').
+
+  """
+  roles = _GetInstanceDiskRoles(instance)
+  if roles.count(constants.DR_ROLE_FIRMWARE) != 1:
+    raise retry.RetryAgain("Expected exactly one firmware disk, got"
+                           " roles: %s" % roles)
+
+
+def _AssertUefiFirmwareDiskPresent(instance):
+  """Assert that the instance has exactly one firmware disk and show it."""
+  _AssertUefiFirmwareDisk(instance)
+  # gnt-instance info must surface the firmware disk; hiding it would be
+  # dangerous since losing its OVMF NVRAM bricks the instance.
+  AssertCommand(["gnt-instance", "info",
+                 instance if isinstance(instance, str) else instance.name])
+
+
+def CreateUefiInstance(nodes, disk_template, fail=False, start=True):
+  """Create a UEFI (boot_type=uefi) instance with the given disk template.
+
+  This is to UEFI instances what L{CreateInstanceByDiskTemplate} is to
+  ordinary instances: it acquires an instance name, passes
+  ``-H kvm:boot_type=uefi`` plus the generic add parameters, and records
+  the disk template on success. The OVMF code/vars templates must exist
+  on the nodes (the existence check is node-side, at firmware disk seed
+  time).
+
+  @type nodes: list of nodes
+  @param nodes: nodes to create the instance on; the number of nodes
+                used matches the requirements of the disk template
+  @type disk_template: string
+  @param disk_template: disk template to use
+  @type fail: bool
+  @param fail: whether the creation is expected to fail
+  @type start: bool
+  @param start: whether to start the instance after creation; UEFI QA
+                tests keep the instance stopped (see L{TestUefiInstanceAdd})
+  @return: the created instance, or None if C{fail} is true
+
+  """
+  instance = qa_config.AcquireInstance()
+  try:
+    if disk_template == constants.DT_DRBD8:
+      nodes_spec = ":".join(n.primary for n in nodes[:2])
+    else:
+      nodes_spec = nodes[0].primary
+    cmd = (["gnt-instance", "add",
+            "--os-type=%s" % qa_config.get("os"),
+            "--disk-template=%s" % disk_template,
+            "-H", "kvm:boot_type=uefi",
+            "--node=%s" % nodes_spec] +
+           GetGenericAddParameters(instance, disk_template))
+    if not start:
+      cmd.append("--no-start")
+    cmd.append(instance.name)
+
+    AssertCommand(cmd, fail=fail)
+
+    if not fail:
+      CheckSsconfInstanceList(instance.name)
+      instance.SetDiskTemplate(disk_template)
+      return instance
+  except:
+    instance.Release()
+    raise
+
+  assert fail
+  instance.Release()
+  return None
+
+
+@InstanceCheck(None, INST_DOWN, RETURN_VALUE)
+def TestUefiInstanceAdd(nodes, disk_template):
+  """gnt-instance add -H kvm:boot_type=uefi (instance stays stopped)
+
+  Creates a UEFI instance and verifies the firmware disk's config-side
+  surface: it is a real disk in the instance's disk list, tagged with
+  the ``firmware`` role, using the same dev_type as the data disks.
+
+  The instance is never started: the standard QA setup boots instances
+  via direct-kernel boot with an initrd that handles ACPI shutdown
+  events, which does not work under UEFI; starting the instance would
+  make every subsequent shutdown time out. All UEFI QA tests therefore
+  operate on stopped instances only.
+
+  @type nodes: list of nodes
+  @param nodes: nodes to create the instance on
+  @type disk_template: string
+  @param disk_template: disk template to use
+  @return: the created (stopped) instance
+
+  """
+  instance = CreateUefiInstance(nodes, disk_template, start=False)
+  _AssertUefiFirmwareDiskPresent(instance)
+  return instance
+
+
+@InstanceCheck(INST_DOWN, INST_DOWN, FIRST_ARG)
+def TestUefiInstanceGuards(instance):
+  """Guards protecting the firmware disk (OVMF NVRAM) of a UEFI instance.
+
+  Every command here must fail or preserve the firmware disk: losing
+  the NVRAM bricks the instance. The instance is expected to be stopped
+  throughout.
+
+  """
+  name = instance.name
+
+  # Switching boot_type to uefi while already uefi is an idempotent
+  # no-op (the firmware disk exists and must not be recreated).
+  AssertCommand(["gnt-instance", "modify", "-H", "boot_type=uefi", name])
+  _AssertUefiFirmwareDiskPresent(instance)
+
+  fw_idx = _GetFirmwareDiskIdx(instance)
+
+  # The firmware disk has a fixed size and cannot be grown.
+  AssertCommand(["gnt-instance", "grow-disk", name, str(fw_idx), "128M"],
+                fail=True)
+
+  # The firmware disk must not be removed or detached while the instance
+  # still boots via uefi (it holds the precious NVRAM).
+  AssertCommand(["gnt-instance", "modify",
+                 "--disk", "%s:remove" % fw_idx, "--no-hotplug", name],
+                fail=True)
+  AssertCommand(["gnt-instance", "modify",
+                 "--disk", "%s:detach" % fw_idx, "--no-hotplug", name],
+                fail=True)
+  _AssertUefiFirmwareDiskPresent(instance)
+
+  # Exporting a UEFI instance is rejected: export/import does not
+  # round-trip the firmware disk, so a restored backup would boot as a
+  # bricked instance.
+  AssertCommand(["gnt-backup", "export", "-n",
+                 qa_config.GetMasterNode().primary, name], fail=True)
+
+  # Recreating the firmware disk as an empty volume would blank it: an
+  # explicit --disk N on the firmware index must be rejected...
+  AssertCommand(["gnt-instance", "recreate-disks",
+                 "--disk=%s" % fw_idx, name], fail=True)
+  # ... while a bare recreate-disks (all data disks) must preserve it.
+  # The data disks must be destroyed first, or the run fails on the
+  # existing volumes (as in TestRecreateDisks). Only the data disks are
+  # destroyed: destroying the firmware volume itself would blank the
+  # NVRAM the test is about to prove survives. LVM-backed only: for
+  # file-backed templates the data and firmware disks share one
+  # storage directory and cannot be destroyed separately.
+  if instance.disk_template in (constants.DT_PLAIN, constants.DT_DRBD8):
+    _DestroyInstanceDisks(instance, skip_firmware=True)
+    AssertCommand(["gnt-instance", "recreate-disks", name])
+    _AssertUefiFirmwareDiskPresent(instance)
+
+  # Switching away from uefi keeps the firmware disk in place (it holds
+  # the precious NVRAM even if the instance no longer boots via uefi)...
+  AssertCommand(["gnt-instance", "modify", "-H", "boot_type=bios", name])
+  _AssertUefiFirmwareDiskPresent(instance)
+  # ... but it can be removed explicitly once the instance no longer
+  # boots via uefi.
+  AssertCommand(["gnt-instance", "modify",
+                 "--disk", "%s:remove" % _GetFirmwareDiskIdx(instance),
+                 "--no-hotplug", name])
+  if constants.DR_ROLE_FIRMWARE in _GetInstanceDiskRoles(instance):
+    raise qa_error.Error("Firmware disk still present after explicit"
+                         " removal from %s" % name)
+
+  # Back to uefi for the tests that follow (e.g. failover): this
+  # recreates and seeds the firmware disk.
+  AssertCommand(["gnt-instance", "modify", "-H", "boot_type=uefi", name])
+  _AssertUefiFirmwareDiskPresent(instance)
+
+
+@InstanceCheck(INST_DOWN, INST_DOWN, FIRST_ARG)
+def TestUefiInstanceConvertDiskTemplate(instance, requested_conversions):
+  """gnt-instance modify -t for a stopped UEFI instance
+
+  Disk-template conversion regenerates every disk from the data-disk
+  specs; the firmware role must be carried across by position or the
+  converted instance would silently lose its OVMF NVRAM.
+
+  @param requested_conversions: disk templates to convert to and back,
+      as for L{TestInstanceConvertDiskTemplate}
+
+  """
+  if len(requested_conversions) < 2:
+    print(qa_utils.FormatInfo("You must specify more than one convertible"
+                              " disk template in order to test the"
+                              " conversion feature"))
+    return
+
+  name = instance.name
+  template = instance.disk_template
+  if template in constants.DTS_NOT_CONVERTIBLE_FROM:
+    print(qa_utils.FormatInfo("Unsupported template %s, skipping conversion"
+                              " test" % template))
+    return
+
+  inodes = qa_config.AcquireManyNodes(2)
+  master = qa_config.GetMasterNode()
+
+  snode = inodes[0].primary
+  if master.primary == snode:
+    snode = inodes[1].primary
+
+  enabled_disk_templates = qa_config.GetEnabledDiskTemplates()
+
+  for templ in requested_conversions:
+    if (templ == template or
+        templ not in enabled_disk_templates or
+        templ in constants.DTS_NOT_CONVERTIBLE_TO):
+      continue
+    cmd = ["gnt-instance", "modify", "-t", templ]
+    if templ == constants.DT_DRBD8:
+      cmd.extend(["-n", snode])
+    cmd.append(name)
+    AssertCommand(cmd)
+    _AssertUefiFirmwareDiskPresent(instance)
+
+  # Before we return, convert back to the original template
+  cmd = ["gnt-instance", "modify", "-t", template]
+  if template == constants.DT_DRBD8:
+    cmd.extend(["-n", snode])
+  cmd.append(name)
+  AssertCommand(cmd)
+  _AssertUefiFirmwareDiskPresent(instance)
+
+
+@InstanceCheck(INST_DOWN, INST_DOWN, FIRST_ARG)
+def TestUefiInstanceFailover(instance):
+  """gnt-instance failover of a stopped UEFI instance
+
+  The instance is stopped: failover changes the primary node and leaves
+  it stopped (it never boots, so the ACPI shutdown caveat does not
+  apply). The mirrored firmware disk must fail over with it.
+
+  """
+  if not IsFailoverSupported(instance):
+    print(qa_utils.FormatInfo("Instance doesn't support failover, skipping"
+                              " test"))
+    return
+
+  AssertCommand(["gnt-instance", "failover", "--force", instance.name])
+  _AssertUefiFirmwareDiskPresent(instance)
+
+  # ... and back
+  AssertCommand(["gnt-instance", "failover", "--force", instance.name])
+  _AssertUefiFirmwareDiskPresent(instance)
+
+
+@InstanceCheck(INST_DOWN, INST_DOWN, FIRST_ARG)
+def TestUefiInstanceMove(instance, newnode):
+  """gnt-instance move of a stopped UEFI instance (cold move)
+
+  Only for copyable templates (plain, file): the byte-copy path must
+  carry the firmware disk to the new node.
+
+  """
+  if instance.disk_template not in constants.DTS_COPYABLE:
+    print(qa_utils.FormatInfo("Instance doesn't support move, skipping"
+                              " test"))
+    return
+
+  orig_node = _GetInstanceField(instance.name, "pnode")
+
+  AssertCommand(["gnt-instance", "move", "-n", newnode.primary,
+                 instance.name])
+  _AssertUefiFirmwareDiskPresent(instance)
+
+  # ... and back
+  AssertCommand(["gnt-instance", "move", "-n", orig_node, instance.name])
+  _AssertUefiFirmwareDiskPresent(instance)

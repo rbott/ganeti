@@ -41,6 +41,7 @@ from ganeti import _constants
 from ganeti import constants
 from ganeti import compat
 from ganeti import utils
+from ganeti.utils import retry
 from ganeti import pathutils
 
 from qa import qa_config
@@ -1223,6 +1224,78 @@ def TestClusterModifyUserShutdown():
     else:
       print("%s hypervisor is not enabled, skipping test for this hypervisor" \
           % hv)
+
+
+def TestClusterModifyBootType(instance):
+  """gnt-cluster modify -H kvm:boot_type=uefi (the cluster default flip)
+
+  Setting the cluster-wide KVM boot_type default to uefi while KVM
+  instances without an instance-level boot_type override and without a
+  UEFI firmware disk exist is refused; --force applies the change and
+  submits a follow-up gnt-instance modify job for every affected
+  *stopped* instance (creating and seeding its firmware disk).
+
+  The guard and the --force machinery only fire on uefi; flipping to
+  other values (and resetting to the default) is unguarded.
+
+  @type instance: instance object
+  @param instance: a stopped KVM instance WITHOUT an instance-level
+      boot_type override and WITHOUT a firmware disk (i.e. created
+      without -H boot_type=...).
+
+  """
+  if constants.HT_KVM not in qa_config.GetEnabledHypervisors():
+    print(qa_utils.FormatInfo("KVM hypervisor is not enabled, skipping test"))
+    return
+
+  name = instance.name
+
+  # Remember the cluster-wide KVM boot_type default (cluster hvparams
+  # have no 'default' keyword: restoring means setting it back to the
+  # recorded value).
+  orig_boot_type = _GetClusterField(
+    ["Hypervisor parameters", constants.HT_KVM,
+     constants.HV_BOOT_TYPE])
+
+  # The unguarded directions: flipping the cluster default to bios and
+  # back to the original value is a pure config change (no instance has
+  # boot_type=uefi semantics, so no firmware disk is required).
+  AssertCommand(["gnt-cluster", "modify", "-H",
+                 "kvm:boot_type=%s" % constants.HT_BOOT_BIOS])
+  AssertCommand(["gnt-cluster", "modify", "-H",
+                 "kvm:boot_type=%s" % orig_boot_type])
+
+  # Refused while an affected instance (no instance-level override, no
+  # firmware disk) exists...
+  AssertCommand(["gnt-cluster", "modify", "-H", "kvm:boot_type=uefi"],
+                fail=True)
+  # ... and the refusal message must point at the recovery path
+  # ('gnt-instance modify -H boot_type=uefi <name>').
+  AssertCommand(["sh", "-c",
+                 "gnt-cluster modify -H kvm:boot_type=uefi 2>&1 |"
+                 " grep -F %s" % utils.ShellQuote("boot_type=uefi")])
+
+  # --force applies the change and submits a follow-up job that
+  # creates and seeds the firmware disk of the stopped instance,
+  # pinning boot_type=uefi at instance level. The follow-up job runs
+  # asynchronously, so the firmware disk must be polled for.
+  AssertCommand(["gnt-cluster", "modify", "-H", "kvm:boot_type=uefi",
+                 "--force"])
+  retry.Retry(lambda: qa_instance._AssertUefiFirmwareDisk(instance),
+              2.0, 60.0)
+
+  # The migrated instance now has an explicit (pinned) instance-level
+  # boot_type=uefi, so the cluster default can be reset without the
+  # guard firing; the instance keeps booting UEFI either way.
+  AssertCommand(["gnt-cluster", "modify", "-H",
+                 "kvm:boot_type=%s" % orig_boot_type])
+  qa_instance._AssertUefiFirmwareDiskPresent(instance)
+
+  # Un-pin the instance again for the tests that follow (the firmware
+  # disk stays in place; switching away from uefi never drops it).
+  AssertCommand(["gnt-instance", "modify", "-H",
+                 "boot_type=%s" % constants.VALUE_DEFAULT, name])
+
 
 
 def TestClusterInfo():

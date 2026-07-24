@@ -269,6 +269,13 @@
     "instance-replace-disks": false,
     "instance-recreate-disks": false,
 
+    "# UEFI (boot_type=uefi) instance tests. All UEFI instances are": null,
+    "# created stopped and never booted. Requires the OVMF templates": null,
+    "# (ovmf_code / ovmf_vars, see configure --with-ovmf-*-template)": null,
+    "# to exist on the nodes; they are seeded node-side into each": null,
+    "# UEFI instance's firmware disk.": null,
+    "instance-add-uefi-offline": false,
+
     "# Whether to test the tools/move-instance utility": null,
     "inter-cluster-instance-move": false,
 
