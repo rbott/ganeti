@@ -127,6 +127,7 @@ import qualified AutoConf
 import qualified Ganeti.Constants as C
 import qualified Ganeti.ConstantUtils as ConstantUtils
 import Ganeti.JSON (DictObject(..), Container, emptyContainer, GenericContainer)
+import Ganeti.JSON.AesonInstances ()
 import Ganeti.Objects.BitArray (BitArray)
 import Ganeti.Objects.Disk
 import Ganeti.Objects.Nic

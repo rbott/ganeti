@@ -164,6 +164,7 @@ HS_DIRS = \
 	src/Ganeti/Hypervisor/Xen \
 	src/Ganeti/JQScheduler \
 	src/Ganeti/JQueue \
+	src/Ganeti/JSON \
 	src/Ganeti/Locking \
 	src/Ganeti/Logging \
 	src/Ganeti/MaintD \
@@ -330,6 +331,7 @@ BUILDTIME_DIRS = \
 	dist/build/Ganeti/Hypervisor/Xen \
 	dist/build/Ganeti/JQScheduler \
 	dist/build/Ganeti/JQueue \
+	dist/build/Ganeti/JSON \
 	dist/build/Ganeti/Locking \
 	dist/build/Ganeti/Logging \
 	dist/build/Ganeti/Metad \
@@ -1117,6 +1119,8 @@ HS_LIB_SRCS = \
 	src/Ganeti/JQueue/Lens.hs \
 	src/Ganeti/JQueue/Objects.hs \
 	src/Ganeti/JSON.hs \
+	src/Ganeti/JSON/Aeson.hs \
+	src/Ganeti/JSON/AesonInstances.hs \
 	src/Ganeti/Jobs.hs \
 	src/Ganeti/Kvmd.hs \
 	src/Ganeti/Lens.hs \

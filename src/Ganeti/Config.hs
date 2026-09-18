@@ -93,7 +93,8 @@ import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Text.JSON as J
+import qualified Data.ByteString.Lazy.UTF8 as UTF8L
+import qualified Data.Aeson as A
 import System.IO
 
 import Ganeti.BasicTypes
@@ -113,13 +114,18 @@ type LinkIpMap = M.Map String (M.Map String String)
 readConfig :: FilePath -> IO (Result String)
 readConfig = runResultT . liftIO . readFile
 
--- | Parses the configuration file.
+-- | Parses the configuration file using the fast aeson decoder. The
+-- resulting 'ConfigData' is identical to what the legacy 'Text.JSON' decoder
+-- would produce (see "Ganeti.JSON.Aeson" for the number-handling contract).
 parseConfig :: String -> Result ConfigData
-parseConfig = fromJResult "parsing configuration" . J.decodeStrict
+parseConfig s =
+  case A.eitherDecode (UTF8L.fromString s) of
+    Left e  -> Bad $ "parsing configuration: " ++ e
+    Right x -> Ok x
 
--- | Encodes the configuration file.
+-- | Encodes the configuration file using the fast aeson encoder.
 encodeConfig :: ConfigData -> String
-encodeConfig = J.encodeStrict
+encodeConfig = UTF8L.toString . A.encode
 
 -- | Wrapper over 'readConfig' and 'parseConfig'.
 loadConfig :: FilePath -> IO (Result ConfigData)

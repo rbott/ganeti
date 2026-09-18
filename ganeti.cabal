@@ -139,6 +139,8 @@ Library
     Ganeti.JQueue.Lens
     Ganeti.JQueue.Objects
     Ganeti.JSON
+    Ganeti.JSON.Aeson
+    Ganeti.JSON.AesonInstances
     Ganeti.Jobs
     Ganeti.Kvmd
     Ganeti.Lens
@@ -255,6 +257,9 @@ Library
     , utf8-string                   >= 0.3.7
 
     , attoparsec                    >= 0.10.1.1   && < 0.15
+    , aeson                         >= 1.0        && < 2.3
+    , scientific                    >= 0.3        && < 0.4
+    , vector                        >= 0.10       && < 0.14
     , base64-bytestring             >= 1.0.0.1    && < 1.3
     , case-insensitive              >= 0.4.0.1    && < 1.3
     , curl                          >= 1.3.7      && < 1.4

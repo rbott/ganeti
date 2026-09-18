@@ -44,6 +44,7 @@ import Text.JSON (showJSON, readJSON, JSValue(..))
 import qualified Text.JSON as J
 
 import Ganeti.JSON (Container, fromObj)
+import Ganeti.JSON.AesonInstances ()
 import Ganeti.THH
 import Ganeti.THH.Field
 import Ganeti.Types

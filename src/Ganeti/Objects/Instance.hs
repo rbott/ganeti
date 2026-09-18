@@ -42,6 +42,7 @@ module Ganeti.Objects.Instance where
 import qualified Data.ByteString.UTF8 as UTF8
 
 import Ganeti.JSON (emptyContainer)
+import Ganeti.JSON.AesonInstances ()
 import Ganeti.Objects.Nic
 import Ganeti.THH
 import Ganeti.THH.Field

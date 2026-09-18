@@ -38,6 +38,7 @@ module Ganeti.Objects.Nic where
 
 import qualified Data.ByteString.UTF8 as UTF8
 
+import Ganeti.JSON.AesonInstances ()
 import Ganeti.THH
 import Ganeti.THH.Field
 import Ganeti.Types

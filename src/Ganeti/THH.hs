@@ -102,6 +102,11 @@ import Language.Haskell.TH.Syntax (lift)
 
 import qualified Text.JSON as JSON
 import Text.JSON.Pretty (pp_value)
+import qualified Data.Aeson as A
+import qualified Data.Aeson.KeyMap as KM
+import qualified Data.Aeson.Key as K
+
+import Ganeti.JSON.Aeson (jsValueToAeson, aesonToJSValue)
 
 import Ganeti.JSON (readJSONWithDesc, fromObj, DictObject(..), ArrayObject(..),
                     maybeFromObj, mkUsedKeys, showJSONtoDict, readJSONfromDict,
@@ -1088,7 +1093,6 @@ buildObjectWithForthcoming sname field_pfx fields = do
       forth_d = NormalC (mkName forth_nm)
                   [(myNotStrict, ConT (mkName forth_data_nm))]
   let declD = gntDataD [] name [] [real_d, forth_d] [''Show, ''Eq]
-
   read_body <- [| branchOnField "forthcoming"
                   (liftM $(conE $ mkName forth_nm) . JSON.readJSON)
                   (liftM $(conE $ mkName real_nm) . JSON.readJSON) |]
@@ -1105,6 +1109,21 @@ buildObjectWithForthcoming sname field_pfx fields = do
                  ]
       instJSONdecl = gntInstanceD [] (AppT (ConT ''JSON.JSON) (ConT name))
                      [rdjson, shjson]
+  -- aeson instances for the wrapper, dispatching on the "forthcoming" key
+  let isForthE = [| \v -> case v of
+                      A.Object o -> KM.lookup (K.fromString "forthcoming") o
+                                      == Just (A.Bool True)
+                      _          -> False |]
+  toj_body <- [| \v -> jsValueToAeson (JSON.showJSON v) |]
+  let toj = FunD 'A.toJSON [Clause [] (NormalB toj_body) []]
+  v <- newName "v"
+  pj_body <- [| if $isForthE $(varE v)
+                  then liftM $(conE $ mkName forth_nm) (A.parseJSON $(varE v))
+                  else liftM $(conE $ mkName real_nm) (A.parseJSON $(varE v)) |]
+  let pj = FunD 'A.parseJSON [Clause [VarP v] (NormalB pj_body) []]
+      instAeson = [ gntInstanceD [] (AppT (ConT ''A.ToJSON) (ConT name)) [toj]
+                  , gntInstanceD [] (AppT (ConT ''A.FromJSON) (ConT name)) [pj]
+                  ]
   accessors <- liftM concat . flip mapM fields
                  $ buildAccessor (mkName forth_nm) forth_pfx
                                  (mkName real_nm) real_pfx
@@ -1144,6 +1163,7 @@ buildObjectWithForthcoming sname field_pfx fields = do
                        ]
   return $ concreteDecls ++ forthcomingDecls ++ [declD, instJSONdecl]
            ++ forthPredDecls ++ accessors ++ lenses ++ [instDict, instArray]
+           ++ instAeson
 
 -- | Generates an object definition: data type and its JSON instance.
 buildObjectSerialisation :: String -> [Field] -> Q [Dec]
@@ -1155,9 +1175,10 @@ buildObjectSerialisation sname fields = do
   (loadsig, loadfn) <- genLoadObject sname
   shjson <- objectShowJSON sname
   rdjson <- objectReadJSON sname
+  aesondecls <- genAesonInstances sname
   let instdecl = gntInstanceD [] (AppT (ConT ''JSON.JSON) (ConT name))
                  [rdjson, shjson]
-  return $ dictdecls ++ savedecls ++ [loadsig, loadfn, instdecl]
+  return $ dictdecls ++ savedecls ++ [loadsig, loadfn, instdecl] ++ aesondecls
 
 -- | An internal name used for naming variables that hold the entire
 -- object of type @[(String,JSValue)]@.
@@ -1338,6 +1359,49 @@ objectReadJSON name = do
              readJSONWithDesc $(stringE name) $(varE s) |]
   return $ FunD 'JSON.readJSON [Clause [VarP s] (NormalB body) []]
 
+-- * Aeson instances
+--
+-- These provide a fast aeson-based (de)serialisation path that mirrors the
+-- 'Text.JSON' representation exactly. Encoding reuses the existing
+-- 'DictObject'-based 'saveX' function and converts the result once with
+-- 'jsValueToAeson'; decoding reuses the existing 'loadX' (which already
+-- handles defaults, optional fields and custom per-field readers) via
+-- 'aesonToJSValue'. The performance win comes from aeson's fast bytestring
+-- encoder/decoder driving the conversion.
+
+-- | Generates the aeson 'ToJSON' instance for an object type. It builds the
+-- aeson object directly from the 'DictObject' 'toDict' output, converting
+-- each field's 'JSValue' with 'jsValueToAeson', so there is no intermediate
+-- 'JSValue' object node.
+objectToJSON :: String -> Q Dec
+objectToJSON sname = do
+  body <- [| A.Object . KM.fromList
+             . map (\(k, v) -> (K.fromString k, jsValueToAeson v))
+             . toDict |]
+  return $ FunD 'A.toJSON [Clause [] (NormalB body) []]
+
+-- | Generates the aeson 'FromJSON' instance for an object type, delegating
+-- to the existing 'loadX' via 'aesonToJSValue'.
+objectParseJSON :: String -> Q Dec
+objectParseJSON sname = do
+  v <- newName "v"
+  body <- [| case $(varE . mkName $ "load" ++ sname) (aesonToJSValue $(varE v))
+             of
+               JSON.Error e -> fail e
+               JSON.Ok x    -> return x |]
+  return $ FunD 'A.parseJSON [Clause [VarP v] (NormalB body) []]
+
+-- | Builds the aeson instance declarations ('ToJSON' and 'FromJSON') for a
+-- given object name.
+genAesonInstances :: String -> Q [Dec]
+genAesonInstances sname = do
+  let name = mkName sname
+  tj <- objectToJSON sname
+  pj <- objectParseJSON sname
+  return [ gntInstanceD [] (AppT (ConT ''A.ToJSON) (ConT name)) [tj]
+         , gntInstanceD [] (AppT (ConT ''A.FromJSON) (ConT name)) [pj]
+         ]
+
 -- * Inheritable parameter tables implementation
 
 -- | Compute parameter type names.
@@ -1400,9 +1464,10 @@ buildPParamSerialisation sname fields = do
   (loadsig, loadfn) <- genLoadObject sname
   shjson <- objectShowJSON sname
   rdjson <- objectReadJSON sname
+  aesondecls <- genAesonInstances sname
   let instdecl = gntInstanceD [] (AppT (ConT ''JSON.JSON) (ConT name))
                  [rdjson, shjson]
-  return $ dictdecls ++ savedecls ++ [loadsig, loadfn, instdecl]
+  return $ dictdecls ++ savedecls ++ [loadsig, loadfn, instdecl] ++ aesondecls
 
 -- | Generates code to save an optional parameter field.
 savePParamField :: Name -> Field -> Q Exp
