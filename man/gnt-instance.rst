@@ -282,9 +282,83 @@ boot\_order
     For KVM the boot order is either "floppy", "cdrom", "disk" or
     "network".  Please note that older versions of KVM couldn't netboot
     from virtio interfaces. This has been fixed in more recent versions
-    and is confirmed to work at least with qemu-kvm 0.11.1. Also note
-    that if you have set the ``kernel_path`` option, that will be used
-    for booting, and this setting will be silently ignored.
+    and is confirmed to work at least with qemu-kvm 0.11.1.
+
+    For KVM, ``boot_order`` is honored only when ``boot_type`` is ``bios``
+    or ``uefi``; under ``direct_kernel`` and ``direct_kernel_efi`` it is
+    ignored. With ``uefi`` the ``floppy`` boot order is rejected.
+
+boot\_type
+    Valid for the KVM hypervisor.
+
+    Selects how a KVM instance boots. One of:
+
+    direct_kernel
+        Direct kernel boot under SeaBIOS using ``kernel_path`` /
+        ``initrd_path`` / ``kernel_args`` (the historical default;
+        ``boot_order`` is ignored).
+
+    bios
+        Legacy BIOS (SeaBIOS) boot driven by ``boot_order``.
+
+    uefi
+        UEFI/OVMF boot driven by ``boot_order`` (the per-instance firmware
+        disk this mode requires is introduced with UEFI support in a
+        following change).
+
+    direct_kernel_efi
+        Direct kernel boot through UEFI/OVMF firmware: the hybrid of
+        ``direct_kernel`` and ``uefi``. QEMU passes ``kernel_path`` /
+        ``initrd_path`` / ``kernel_args`` to the firmware via fw_cfg and
+        OVMF loads the kernel through its EFI stub, so the guest sees a
+        genuine EFI environment (``/sys/firmware/efi`` present) while
+        still booting the injected kernel. ``boot_order`` is ignored, as
+        under ``direct_kernel``.
+
+    ``boot_type`` is the single source of truth for the boot mode. Setting
+    ``kernel_path`` to toggle disk boot is **deprecated**; set ``boot_type``
+    explicitly instead. ``kernel_path`` is kept non-empty by default and is
+    simply ignored unless ``boot_type`` is ``direct_kernel`` or
+    ``direct_kernel_efi``.
+
+    The cluster-level default is a creation-time seed: it is pinned into
+    every new instance at ``gnt-instance add`` (the default for new
+    clusters is ``direct_kernel``) and later cluster-level changes do not
+    affect existing instances. On cluster upgrade, each instance is pinned
+    from its effective ``kernel_path`` (non-empty -> ``direct_kernel``,
+    empty -> ``bios``).
+
+ovmf\_code
+    Valid for the KVM hypervisor.
+
+    Path (on the node) to the OVMF firmware *code* template used to seed a
+    UEFI instance's firmware disk at creation. Defaults to the configure-time
+    ``--with-ovmf-code-template`` value (``/usr/share/OVMF/OVMF_CODE.fd``).
+    Override it on an individual instance to pin an alternative OVMF build.
+    The firmware code is pinned per instance at creation, so updating the
+    node's OVMF package does not change running instances.
+
+    Both templates are read exactly once, at firmware disk creation (instance
+    ``add``). Changing them afterwards on an instance with an existing
+    firmware disk has no effect until a future re-seed maintenance command
+    exists. Pair ``ovmf_code`` and ``ovmf_vars`` from the same OVMF build;
+    Ganeti cannot verify this.
+
+ovmf\_vars
+    Valid for the KVM hypervisor.
+
+    Path (on the node) to the OVMF firmware *vars* (NVRAM) template used to
+    seed a UEFI instance's firmware disk at creation. Defaults to the
+    configure-time ``--with-ovmf-vars-template`` value
+    (``/usr/share/OVMF/OVMF_VARS.fd``).
+
+    Like ``ovmf_code``, it is read exactly once at seed time; later changes
+    are no-ops until the future re-seed command exists (which will re-seed
+    code by default and vars only explicitly, since the vars region holds
+    the precious per-instance NVRAM). Pair ``ovmf_code`` and ``ovmf_vars``
+    from the same OVMF build, e.g. a secure-boot pair:
+    ``-H ovmf_code=/usr/share/OVMF/OVMF_CODE.secboot.fd,``
+    ``ovmf_vars=/usr/share/OVMF/OVMF_VARS.secboot.fd``.
 
 blockdev\_prefix
     Valid for the Xen HVM and PVM hypervisors.
@@ -599,10 +673,14 @@ kernel\_path
     Valid for the Xen PVM and KVM hypervisors.
 
     This option specifies the path (on the node) to the kernel to boot
-    the instance with. Xen PVM instances always require this, while for
-    KVM if this option is empty, it will cause the machine to load the
-    kernel from its disks (and the boot will be done accordingly to
-    ``boot_order``).
+    the instance with. Xen PVM instances always require this.
+
+    For KVM, ``kernel_path`` is honored under ``direct_kernel`` and
+    ``direct_kernel_efi``. Using an empty ``kernel_path`` to switch a KVM
+    instance to disk/firmware boot is **deprecated**: set ``boot_type``
+    (``bios`` or ``uefi``) explicitly instead. For backwards compatibility
+    the boot mode of pre-4.0 instances is derived from ``kernel_path`` on
+    upgrade (see ``boot_type``).
 
 kernel\_args
     Valid for the Xen PVM and KVM hypervisors.
