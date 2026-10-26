@@ -64,6 +64,10 @@ def _ShutdownInstance(name):
   @param name: full name of the instance
 
   """
+  # The instance may have been started just moments ago (by the watcher
+  # under test or a preceding test); let the guest settle before issuing
+  # a graceful shutdown (cf. the settle wait in qa_instance.py).
+  time.sleep(5)
   AssertCommand(["gnt-instance", "shutdown", "--no-remember", name])
 
   if _InstanceRunning(name):

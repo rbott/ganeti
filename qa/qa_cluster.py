@@ -464,6 +464,10 @@ def TestClusterEpo():
   AssertCommand(["gnt-cluster", "epo", "-f", master.primary], fail=True)
 
   with qa_job_utils.PausedWatcher():
+    # EPO gracefully shuts down all instances, which may have been
+    # created/started just moments ago; let the guests settle first
+    # (cf. the settle wait in qa_instance.py).
+    time.sleep(5)
     # This shouldn't fail
     AssertCommand(["gnt-cluster", "epo", "-f", "--all"])
 

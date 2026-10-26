@@ -368,9 +368,27 @@ def TestInstanceStartup(instance):
   AssertCommand(["gnt-instance", "startup", instance.name])
 
 
+def _WaitForGuestSettle():
+  """Wait for a freshly started guest to settle before a graceful stop.
+
+  A graceful shutdown/reboot request must not be issued to a guest that
+  is still booting: the kernel acknowledges the request as soon as its
+  xenstore/ACPI event handling is up (subsys_initcall), which happens
+  before the guest's init has mounted /proc (and, for Xen, before the
+  control/shutdown request's usermode handler can act on it). The request
+  is then consumed without effect and silently lost, and the instance
+  idles until Ganeti's shutdown timeout force-destroys it. Wait 5 seconds
+  so that the guest userspace is up and able to react (same reasoning as
+  the settle wait in _TestKVMHotplug).
+
+  """
+  time.sleep(5)
+
+
 @InstanceCheck(INST_UP, INST_DOWN, FIRST_ARG)
 def TestInstanceShutdown(instance):
   """gnt-instance shutdown"""
+  _WaitForGuestSettle()
   AssertCommand(["gnt-instance", "shutdown", instance.name])
 
 
@@ -381,8 +399,16 @@ def TestInstanceReboot(instance):
   reboot_types = options.get("reboot-types", constants.REBOOT_TYPES)
   name = instance.name
   for rtype in reboot_types:
+    # A reboot request is always issued to the guest as a graceful
+    # shutdown first (even --type=hard does shutdown-then-start, see
+    # backend.InstanceReboot), so the guest userspace must be up to
+    # react to it.
+    _WaitForGuestSettle()
     AssertCommand(["gnt-instance", "reboot", "--type=%s" % rtype, name])
 
+  # The guest was just restarted by the last reboot; let it settle before
+  # issuing the next graceful stop.
+  _WaitForGuestSettle()
   AssertCommand(["gnt-instance", "shutdown", name])
   qa_utils.RunInstanceCheck(instance, False)
   AssertCommand(["gnt-instance", "reboot", name])
@@ -750,6 +776,7 @@ def TestInstanceModifyPrimaryAndBack(instance, currentnode, othernode):
   AssertCommand(["gnt-instance", "startup", name])
 
   # and back
+  _WaitForGuestSettle()
   AssertCommand(["gnt-instance", "shutdown", name])
   AssertCommand(["rm", "-rf", disk], node=other)
   AssertCommand(["gnt-instance", "modify", "--new-primary=%s" % current, name])
@@ -1415,8 +1442,12 @@ def _TestInstanceUserDown(instance, hv_shutdown_fn):
 @InstanceCheck(INST_UP, INST_UP, FIRST_ARG)
 def _TestInstanceUserDownXen(instance):
   primary = _GetInstanceField(instance.name, "pnode")
-  fn = lambda: AssertCommand(["xl", "shutdown", "-w", instance.name],
-                             node=primary)
+
+  def fn():
+    # xl shutdown -w issues a graceful xenstore shutdown request; the
+    # guest must be booted to handle it (see _WaitForGuestSettle).
+    _WaitForGuestSettle()
+    AssertCommand(["xl", "shutdown", "-w", instance.name], node=primary)
 
   AssertCommand(["gnt-cluster", "modify", "--user-shutdown=true"])
   _TestInstanceUserDown(instance, fn)
@@ -1436,7 +1467,9 @@ def _TestInstanceUserDownKvm(instance):
   # The instance needs to reboot not because the 'user_shutdown'
   # parameter was modified but because the KVM daemon need to be
   # started, given that the instance was first created with user
-  # shutdown disabled.
+  # shutdown disabled. The reboot issues a graceful shutdown to the
+  # freshly created guest first (see _WaitForGuestSettle).
+  _WaitForGuestSettle()
   AssertCommand(["gnt-instance", "reboot", instance.name])
 
   primary = _GetInstanceField(instance.name, "pnode")
@@ -1479,7 +1512,9 @@ def TestInstanceCommunication(instance, master):
   # Enable instance communication mechanism for this instance
   AssertCommand(["gnt-instance", "modify", "-c", "yes", instance.name])
 
-  # Reboot instance for changes to NIC to take effect
+  # Reboot instance for changes to NIC to take effect; the guest may
+  # have been started just moments ago (see _WaitForGuestSettle).
+  _WaitForGuestSettle()
   AssertCommand(["gnt-instance", "reboot", instance.name])
 
   # Check if the instance is properly configured for instance
@@ -1559,7 +1594,9 @@ def TestInstanceCommunication(instance, master):
   # Disable instance communication mechanism for this instance
   AssertCommand(["gnt-instance", "modify", "-c", "no", instance.name])
 
-  # Reboot instance for changes to NIC to take effect
+  # Reboot instance for changes to NIC to take effect; the guest was
+  # just restarted by the previous reboot (see _WaitForGuestSettle).
+  _WaitForGuestSettle()
   AssertCommand(["gnt-instance", "reboot", instance.name])
 
   # Disable instance communication network at cluster level

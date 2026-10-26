@@ -38,6 +38,7 @@ import os.path
 import random
 import re
 import tempfile
+import time
 import uuid as uuid_module
 
 from ganeti import cli
@@ -1237,6 +1238,10 @@ def TestRapiInstanceFailover(instance):
 @InstanceCheck(INST_UP, INST_DOWN, FIRST_ARG)
 def TestRapiInstanceShutdown(instance):
   """Test stopping an instance via RAPI"""
+  # The instance may have been started seconds ago by the preceding
+  # startup test; give the guest time to boot before its graceful
+  # shutdown request (cf. the settle wait in qa_instance.py).
+  time.sleep(5)
   _WaitForRapiJob(_rapi_client.ShutdownInstance(instance.name))
 
 
